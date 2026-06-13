@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "python build_vercel_bundle.py",
+  "functions": {
+    "app.py": {
+      "excludeFiles": "{.venv/**,venv/**,__pycache__/**,.agents/**,Proposal/**,static/**,ONET_data/**,skills-lock.json}"
+    }
+  }
+}

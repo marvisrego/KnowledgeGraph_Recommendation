@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Career Graph Studio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='chat.css') }}">
+</head>
+<body>
+    <div class="atmosphere"></div>
+    <main class="app-shell">
+        <section class="hero-panel">
+            <p class="eyebrow">Knowledge Graph Grounded Chat</p>
+            <h1>Career Graph Studio</h1>
+            <p class="hero-copy">
+                Test the thesis chatbot against your local O*NET and LinkedIn datasets.
+                Ask for role recommendations, skill gaps, education signals, or grounded evidence from the constructed graph.
+            </p>
+            <div class="status-grid">
+                <article class="status-card">
+                    <span class="status-label">Runtime</span>
+                    <strong id="runtime-state">Loading...</strong>
+                </article>
+                <article class="status-card">
+                    <span class="status-label">LLM</span>
+                    <strong id="llm-state">Checking...</strong>
+                </article>
+                <article class="status-card">
+                    <span class="status-label">Role Nodes</span>
+                    <strong id="role-count">-</strong>
+                </article>
+                <article class="status-card">
+                    <span class="status-label">Posting Sample</span>
+                    <strong id="posting-count">-</strong>
+                </article>
+            </div>
+        </section>
+
+        <section class="chat-panel">
+            <div class="chat-toolbar">
+                <div>
+                    <p class="toolbar-label">Testing Console</p>
+                    <h2>Browser Chat</h2>
+                </div>
+                <button class="ghost-button" id="clear-chat" type="button">Clear transcript</button>
+            </div>
+
+            <div class="chat-log" id="chat-log" aria-live="polite">
+                <article class="message message-assistant intro">
+                    <div class="message-meta">System</div>
+                    <div class="message-bubble">
+                        Try something specific like “I want to become a data scientist and I know Python and SQL”, or something vague like “I need a better job” to test the clarification flow.
+                    </div>
+                </article>
+            </div>
+
+            <form class="composer" id="chat-form">
+                <label class="composer-label" for="message-input">Ask the career graph</label>
+                <div class="composer-row">
+                    <textarea id="message-input" name="message" rows="3" placeholder="Ask about a target role, your current skills, or what role fits your background..." required></textarea>
+                    <button class="send-button" type="submit">Send</button>
+                </div>
+            </form>
+
+            <section class="clarification-panel hidden" id="clarification-panel">
+                <div class="clarification-header">
+                    <p class="toolbar-label">Clarification Needed</p>
+                    <h3>Add missing details</h3>
+                    <p id="clarification-copy">The chatbot needs a few details before it can query the knowledge graph.</p>
+                </div>
+                <form id="clarification-form" class="clarification-form"></form>
+            </section>
+        </section>
+    </main>
+
+    <script src="{{ url_for('static', filename='chat.js') }}"></script>
+</body>
+</html>
