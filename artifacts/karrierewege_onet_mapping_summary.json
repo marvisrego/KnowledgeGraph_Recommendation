@@ -1,0 +1,522 @@
+{
+  "source_files": [
+    "Data\\Karrierewege\\karierrewege_test\\datadrive\\projects\\capadict\\main\\data\\karrierewege_test.csv",
+    "Data\\Karrierewege\\karierrewege_train\\datadrive\\projects\\capadict\\main\\data\\karierewege_train.csv",
+    "Data\\Karrierewege\\karierrewege_validation\\datadrive\\projects\\capadict\\main\\data\\karierewege_validation.csv"
+  ],
+  "detail_csv": "artifacts\\karrierewege_onet_mapping_details.csv",
+  "total_rows": 2480369,
+  "unique_titles": 1295,
+  "matched_titles": 999,
+  "exact_or_alias_titles": 583,
+  "fuzzy_titles": 416,
+  "unmatched_titles": 296,
+  "fuzzy_evaluated_titles": 712,
+  "matched_title_ratio": 0.7714,
+  "matched_rows": 2271335,
+  "matched_row_ratio": 0.9157,
+  "top_unmatched_titles": [
+    {
+      "title": "vehicle maintenance attendant",
+      "count": 27700
+    },
+    {
+      "title": "social pedagogue",
+      "count": 12632
+    },
+    {
+      "title": "specialised seller",
+      "count": 11809
+    },
+    {
+      "title": "assistant lecturer",
+      "count": 11047
+    },
+    {
+      "title": "doorman/doorwoman",
+      "count": 9403
+    },
+    {
+      "title": "bakery specialised seller",
+      "count": 8108
+    },
+    {
+      "title": "raw materials warehouse specialist",
+      "count": 8040
+    },
+    {
+      "title": "vehicle cleaner",
+      "count": 7564
+    },
+    {
+      "title": "contact centre supervisor",
+      "count": 6174
+    },
+    {
+      "title": "higher education lecturer",
+      "count": 5842
+    },
+    {
+      "title": "mixed farmer",
+      "count": 4951
+    },
+    {
+      "title": "motor vehicles specialised seller",
+      "count": 3777
+    },
+    {
+      "title": "foundry operative",
+      "count": 3581
+    },
+    {
+      "title": "flower and garden specialised seller",
+      "count": 3577
+    },
+    {
+      "title": "textile specialised seller",
+      "count": 3436
+    },
+    {
+      "title": "meat and meat products specialised seller",
+      "count": 3224
+    },
+    {
+      "title": "early years teaching assistant",
+      "count": 2936
+    },
+    {
+      "title": "actor/actress",
+      "count": 2854
+    },
+    {
+      "title": "online marketer",
+      "count": 2527
+    },
+    {
+      "title": "residential home adult care worker",
+      "count": 2515
+    },
+    {
+      "title": "hotel butler",
+      "count": 2464
+    },
+    {
+      "title": "domestic electrician",
+      "count": 2140
+    },
+    {
+      "title": "freight transport dispatcher",
+      "count": 1944
+    },
+    {
+      "title": "resilient floor layer",
+      "count": 1921
+    },
+    {
+      "title": "city councillor",
+      "count": 1733
+    },
+    {
+      "title": "fitter and turner",
+      "count": 1529
+    },
+    {
+      "title": "assistant video and motion picture director",
+      "count": 1495
+    },
+    {
+      "title": "education policy officer",
+      "count": 1435
+    },
+    {
+      "title": "healthcare institution manager",
+      "count": 1334
+    },
+    {
+      "title": "cosmetics and perfume specialised seller",
+      "count": 1315
+    },
+    {
+      "title": "commissioning engineer",
+      "count": 1246
+    },
+    {
+      "title": "promotions demonstrator",
+      "count": 1242
+    },
+    {
+      "title": "fuel station specialised seller",
+      "count": 1189
+    },
+    {
+      "title": "paramedic in emergency responses",
+      "count": 1137
+    },
+    {
+      "title": "video and motion picture producer",
+      "count": 1125
+    },
+    {
+      "title": "clothing alteration machinist",
+      "count": 1102
+    },
+    {
+      "title": "furniture specialised seller",
+      "count": 1083
+    },
+    {
+      "title": "specialised doctor",
+      "count": 1000
+    },
+    {
+      "title": "community social worker",
+      "count": 997
+    },
+    {
+      "title": "product and services manager",
+      "count": 911
+    },
+    {
+      "title": "shoe and leather accessories specialised seller",
+      "count": 892
+    },
+    {
+      "title": "ground steward/ground stewardess",
+      "count": 881
+    },
+    {
+      "title": "building materials specialised seller",
+      "count": 876
+    },
+    {
+      "title": "agronomic crop production team leader",
+      "count": 852
+    },
+    {
+      "title": "industrial quality manager",
+      "count": 832
+    },
+    {
+      "title": "business economics researcher",
+      "count": 828
+    },
+    {
+      "title": "audio and video equipment specialised seller",
+      "count": 810
+    },
+    {
+      "title": "concrete products machine operator",
+      "count": 781
+    },
+    {
+      "title": "sports coach",
+      "count": 775
+    },
+    {
+      "title": "costume buyer",
+      "count": 699
+    }
+  ],
+  "top_fuzzy_matches": [
+    {
+      "title": "kitchen porter",
+      "count": 82811,
+      "matched_code": "35-2021.00",
+      "matched_title": "Food Preparation Workers"
+    },
+    {
+      "title": "metal sawing machine operator",
+      "count": 57000,
+      "matched_code": "51-4031.00",
+      "matched_title": "Cutting, Punching, and Press Machine Setters, Operators, and Tenders, Metal and Plastic"
+    },
+    {
+      "title": "food production operator",
+      "count": 39929,
+      "matched_code": "51-2092.00",
+      "matched_title": "Team Assemblers"
+    },
+    {
+      "title": "garden labourer",
+      "count": 39695,
+      "matched_code": "37-3011.00",
+      "matched_title": "Landscaping and Groundskeeping Workers"
+    },
+    {
+      "title": "call centre agent",
+      "count": 37783,
+      "matched_code": "41-9041.00",
+      "matched_title": "Telemarketers"
+    },
+    {
+      "title": "cargo vehicle driver",
+      "count": 32543,
+      "matched_code": "53-3033.00",
+      "matched_title": "Light Truck Drivers"
+    },
+    {
+      "title": "compression moulding machine operator",
+      "count": 30580,
+      "matched_code": "51-4072.00",
+      "matched_title": "Molding, Coremaking, and Casting Machine Setters, Operators, and Tenders, Metal and Plastic"
+    },
+    {
+      "title": "healthcare assistant",
+      "count": 23159,
+      "matched_code": "31-1121.00",
+      "matched_title": "Home Health Aides"
+    },
+    {
+      "title": "building cleaner",
+      "count": 22054,
+      "matched_code": "53-7061.00",
+      "matched_title": "Cleaners of Vehicles and Equipment"
+    },
+    {
+      "title": "motor vehicle parts assembler",
+      "count": 20341,
+      "matched_code": "51-2092.00",
+      "matched_title": "Team Assemblers"
+    },
+    {
+      "title": "civil engineering worker",
+      "count": 17802,
+      "matched_code": "17-2051.00",
+      "matched_title": "Civil Engineers"
+    },
+    {
+      "title": "crop production worker",
+      "count": 17510,
+      "matched_code": "51-9199.00",
+      "matched_title": "Production Workers, All Other"
+    },
+    {
+      "title": "commercial sales representative",
+      "count": 13026,
+      "matched_code": "41-9099.00",
+      "matched_title": "Sales and Related Workers, All Other"
+    },
+    {
+      "title": "chief executive officer",
+      "count": 10520,
+      "matched_code": "11-1011.00",
+      "matched_title": "Chief Executives"
+    },
+    {
+      "title": "domestic housekeeper",
+      "count": 9614,
+      "matched_code": "37-2012.00",
+      "matched_title": "Maids and Housekeeping Cleaners"
+    },
+    {
+      "title": "specialist nurse",
+      "count": 9589,
+      "matched_code": "29-1141.00",
+      "matched_title": "Registered Nurses"
+    },
+    {
+      "title": "sales support assistant",
+      "count": 8428,
+      "matched_code": "41-2031.00",
+      "matched_title": "Retail Salespersons"
+    },
+    {
+      "title": "street food vendor",
+      "count": 6560,
+      "matched_code": "41-9091.00",
+      "matched_title": "Door-to-Door Sales Workers, News and Street Vendors, and Related Workers"
+    },
+    {
+      "title": "membership manager",
+      "count": 5709,
+      "matched_code": "11-2022.00",
+      "matched_title": "Sales Managers"
+    },
+    {
+      "title": "doctors' surgery assistant",
+      "count": 5504,
+      "matched_code": "29-9093.00",
+      "matched_title": "Surgical Assistants"
+    },
+    {
+      "title": "human resources manager",
+      "count": 5330,
+      "matched_code": "11-3121.00",
+      "matched_title": "Human Resources Managers"
+    },
+    {
+      "title": "foster care support worker",
+      "count": 4104,
+      "matched_code": "21-1021.00",
+      "matched_title": "Child, Family, and School Social Workers"
+    },
+    {
+      "title": "road construction worker",
+      "count": 4010,
+      "matched_code": "37-3019.00",
+      "matched_title": "Grounds Maintenance Workers, All Other"
+    },
+    {
+      "title": "building caretaker",
+      "count": 3666,
+      "matched_code": "47-2031.00",
+      "matched_title": "Carpenters"
+    },
+    {
+      "title": "telephone switchboard operator",
+      "count": 3652,
+      "matched_code": "43-2011.00",
+      "matched_title": "Switchboard Operators, Including Answering Service"
+    },
+    {
+      "title": "laundromat attendant",
+      "count": 3452,
+      "matched_code": "51-6011.00",
+      "matched_title": "Laundry and Dry-Cleaning Workers"
+    },
+    {
+      "title": "quality engineering technician",
+      "count": 3417,
+      "matched_code": "17-3026.00",
+      "matched_title": "Industrial Engineering Technologists and Technicians"
+    },
+    {
+      "title": "vehicle technician",
+      "count": 3294,
+      "matched_code": "17-3023.00",
+      "matched_title": "Electrical and Electronic Engineering Technologists and Technicians"
+    },
+    {
+      "title": "groom",
+      "count": 3145,
+      "matched_code": "39-2021.00",
+      "matched_title": "Animal Caretakers"
+    },
+    {
+      "title": "employment agent",
+      "count": 3073,
+      "matched_code": "11-3121.00",
+      "matched_title": "Human Resources Managers"
+    },
+    {
+      "title": "metal drawing machine operator",
+      "count": 2523,
+      "matched_code": "51-4193.00",
+      "matched_title": "Plating Machine Setters, Operators, and Tenders, Metal and Plastic"
+    },
+    {
+      "title": "legal administrative assistant",
+      "count": 2398,
+      "matched_code": "43-6013.00",
+      "matched_title": "Medical Secretaries and Administrative Assistants"
+    },
+    {
+      "title": "land-based machinery operator",
+      "count": 2224,
+      "matched_code": "51-9199.00",
+      "matched_title": "Production Workers, All Other"
+    },
+    {
+      "title": "language school teacher",
+      "count": 2052,
+      "matched_code": "25-2021.00",
+      "matched_title": "Elementary School Teachers, Except Special Education"
+    },
+    {
+      "title": "ICT project manager",
+      "count": 2050,
+      "matched_code": "15-1299.09",
+      "matched_title": "Information Technology Project Managers"
+    },
+    {
+      "title": "transport equipment painter",
+      "count": 1978,
+      "matched_code": "51-9124.00",
+      "matched_title": "Coating, Painting, and Spraying Machine Setters, Operators, and Tenders"
+    },
+    {
+      "title": "disability support worker",
+      "count": 1969,
+      "matched_code": "21-1021.00",
+      "matched_title": "Child, Family, and School Social Workers"
+    },
+    {
+      "title": "ICT account manager",
+      "count": 1964,
+      "matched_code": "11-3021.00",
+      "matched_title": "Computer and Information Systems Managers"
+    },
+    {
+      "title": "eBusiness manager",
+      "count": 1923,
+      "matched_code": "11-1021.00",
+      "matched_title": "General and Operations Managers"
+    },
+    {
+      "title": "destination manager",
+      "count": 1805,
+      "matched_code": "11-3071.00",
+      "matched_title": "Transportation, Storage, and Distribution Managers"
+    },
+    {
+      "title": "laundry and dry cleaning manager",
+      "count": 1743,
+      "matched_code": "51-6011.00",
+      "matched_title": "Laundry and Dry-Cleaning Workers"
+    },
+    {
+      "title": "green ICT consultant",
+      "count": 1739,
+      "matched_code": "13-1199.05",
+      "matched_title": "Sustainability Specialists"
+    },
+    {
+      "title": "production plant crane operator",
+      "count": 1707,
+      "matched_code": "51-2099.00",
+      "matched_title": "Assemblers and Fabricators, All Other"
+    },
+    {
+      "title": "mechatronics assembler",
+      "count": 1702,
+      "matched_code": "51-2022.00",
+      "matched_title": "Electrical and Electronic Equipment Assemblers"
+    },
+    {
+      "title": "educational researcher",
+      "count": 1679,
+      "matched_code": "25-1081.00",
+      "matched_title": "Education Teachers, Postsecondary"
+    },
+    {
+      "title": "pastry maker",
+      "count": 1611,
+      "matched_code": "51-3011.00",
+      "matched_title": "Bakers"
+    },
+    {
+      "title": "household appliances repair technician",
+      "count": 1551,
+      "matched_code": "49-9031.00",
+      "matched_title": "Home Appliance Repairers"
+    },
+    {
+      "title": "amusement and recreation attendant",
+      "count": 1510,
+      "matched_code": "39-3091.00",
+      "matched_title": "Amusement and Recreation Attendants"
+    },
+    {
+      "title": "quality services manager",
+      "count": 1472,
+      "matched_code": "11-3013.01",
+      "matched_title": "Security Managers"
+    },
+    {
+      "title": "dental technician",
+      "count": 1430,
+      "matched_code": "15-2099.01",
+      "matched_title": "Bioinformatics Technicians"
+    }
+  ]
+}
