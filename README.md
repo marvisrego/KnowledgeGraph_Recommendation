@@ -13,17 +13,17 @@ An intelligent career guidance chatbot powered by a knowledge graph combining ON
 
 ### Core Components
 - **Graph Database:** NetworkX DiGraph with 22,259 nodes and 235,501 edges
-- **Embedding Index:** Azure text-embedding-3-large + ChromaDB for semantic search
-- **Reranker:** Cohere rerank-v4.0-pro for ranking candidate roles
-- **LLM:** Azure OpenAI Responses API (gpt-5.4-nano) for conversational responses
+- **Embedding Index:** Text embeddings + vector database for semantic search
+- **Reranking:** Multi-stage reranking for candidate role selection
+- **LLM:** Conversational AI for context-aware career guidance
 
 ### 6-Step Inference Pipeline
 1. **route_intent()** — Detect user type (student/professional); validate context
-2. **retrieve_candidates()** — Embed query; fetch top-50 role candidates from ChromaDB
-3. **rerank_candidates()** — Cohere rerank → top-5 anchors
+2. **retrieve_candidates()** — Embed query; fetch top-50 role candidates
+3. **rerank_candidates()** — Rank candidates by relevance
 4. **traverse_graph()** — Collect related skills, roles, and prerequisites
 5. **generate_response()** — LLM generation with context-aware system prompt
-6. **fetch_coursera_courses()** — Scrape Coursera for course recommendations
+6. **fetch_coursera_courses()** — Recommend courses for skill development
 
 ### Data Schema
 - **Nodes:** ONET roles (1,016), ESCO roles (3,039), skills, job elements
@@ -32,7 +32,6 @@ An intelligent career guidance chatbot powered by a knowledge graph combining ON
 ## Quick Start
 
 ```bash
-# Install and run
 pip install -r requirements.txt
 python career_kg_web.py
 # → http://127.0.0.1:8001
@@ -40,54 +39,47 @@ python career_kg_web.py
 
 ## Configuration
 
-Create `.env` with Azure API credentials:
-```env
-CHAT_MODEL_API_KEY = <key>
-EMBED_MODEL_API_KEY = <key>
-COHERE_RERANK_API_KEY = <key>
-```
-
-See HANDOFF.md for full configuration details.
+Create `.env` file with API credentials for:
+- LLM provider (chat API)
+- Embeddings service
+- Reranking service
 
 ## Project Structure
 
 ```
 config.py                  Settings and environment loading
 src/
-  onet_preprocessing.py    ONET Excel processing
-  esco_preprocessing.py    ESCO CSV processing
-  graph_build.py           NetworkX graph construction
-  embeddings_index.py      Azure embeddings + ChromaDB
-  inference_pipeline.py    6-step query pipeline
-career_kg_web.py           Flask server
-coursera_client.py         Course recommendations scraper
+  onet_preprocessing.py    ONET data processing
+  esco_preprocessing.py    ESCO data processing
+  graph_build.py           Graph construction
+  embeddings_index.py      Embeddings and indexing
+  inference_pipeline.py    Query processing pipeline
+career_kg_web.py           Flask web server
+coursera_client.py         Course recommendations
 templates/
-  index.html               Chat UI (dark design, Inter font)
-  graph.html               Interactive Cytoscape.js viewer
+  index.html               Chat interface
+  graph.html               Knowledge graph viewer
 public/
-  chat.js / chat.css       Frontend logic and styling
+  chat.js / chat.css       Frontend components
 ```
 
 ## Example Prompts
 
-**Student:** "I just graduated with a BSc in Computer Science, I know Python and SQL, I want to go into data science."
+**Student:** "I graduated with a BSc in Computer Science, I know Python and SQL, I want to go into data science."
 
-**Professional:** "I am a data analyst with 4 years experience using Python and SQL. I want to switch to machine learning."
+**Professional:** "I am a data analyst with 4 years experience. I want to switch to a machine learning role."
 
 ## Verification
 
 ```bash
-# Check graph integrity
-python -c "import pickle; G=pickle.load(open('graph/graph.gpickle','rb')); print(G.number_of_nodes(), G.number_of_edges())"
-
-# Test API health
+python -c "import pickle; G=pickle.load(open('graph/graph.gpickle','rb')); print(f'Nodes: {G.number_of_nodes()}, Edges: {G.number_of_edges()}')"
 curl http://127.0.0.1:8001/api/status
 ```
 
 ## Status
 
-Fully built and running. Graph and embeddings are pre-computed. No rebuild needed unless source data changes.
+Fully functional. Pre-computed graph and embeddings included.
 
 ## Author
 
-marvisrego | https://github.com/marvisrego/KnowledgeGraph_Recommendation
+marvisrego
