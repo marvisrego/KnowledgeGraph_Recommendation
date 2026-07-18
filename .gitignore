@@ -1,0 +1,37 @@
+# --- Secrets ---
+.env
+
+# --- Built artifacts (regenerate with build_graph.py --embed) ---
+graph/
+index/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# --- Data / raw files ---
+Data/
+
+# --- Misc artifacts ---
+artifacts/career_kg_bundle.pkl
+artifacts/linkedin_kg_bundle.pkl
+artifacts/monster_kg_bundle.pkl
+artifacts/docx_transcripts/
+
+# --- Claude / agent internals ---
+.claude/
+.agents/
+.antigravitycli/
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Skills lock (tooling internal) ---
+skills-lock.json
