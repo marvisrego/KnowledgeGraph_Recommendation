@@ -13,9 +13,9 @@ An intelligent career guidance chatbot powered by a knowledge graph combining ON
 
 ### Core Components
 - **Graph Database:** NetworkX DiGraph (22,259 nodes, 235,501 edges)
-- **Embedding Index:** Semantic search via embeddings and vector database
-- **Reranking:** Multi-stage candidate ranking for career roles
-- **LLM:** Conversational AI for context-aware guidance
+- **Embeddings:** text-embedding-3-large for semantic search
+- **Reranking:** Cohere rerank for candidate ranking
+- **LLM:** GPT-5.4-nano for conversational guidance
 
 ### 6-Step Pipeline
 1. **route_intent()** — Detect user type; validate context
