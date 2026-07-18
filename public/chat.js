@@ -11,16 +11,63 @@ const chatLog = document.getElementById("chat-log");
 const chatForm = document.getElementById("chat-form");
 const messageInput = document.getElementById("message-input");
 const clearChatButton = document.getElementById("clear-chat");
+const preloader = document.getElementById("preloader");
 
 let chatHistory = [];
 
+/* ─── PRELOADER ─── */
+window.addEventListener("load", () => {
+    setTimeout(() => {
+        preloader.classList.add("hidden");
+        runEntryAnimations();
+    }, 800);
+});
+
+/* ─── GSAP ENTRY ANIMATIONS ─── */
+function runEntryAnimations() {
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reducedMotion) return;
+
+    const heroElements = document.querySelectorAll("[data-animate='fade-up']");
+    gsap.fromTo(heroElements,
+        { opacity: 0, y: 24 },
+        {
+            opacity: 1,
+            y: 0,
+            duration: 0.7,
+            stagger: 0.1,
+            ease: "power3.out",
+            delay: 0.2
+        }
+    );
+
+    const chatPanel = document.getElementById("chat-panel");
+    gsap.fromTo(chatPanel,
+        { opacity: 0, y: 20, scale: 0.98 },
+        {
+            opacity: 1,
+            y: 0,
+            scale: 1,
+            duration: 0.8,
+            ease: "power3.out",
+            delay: 0.5
+        }
+    );
+}
+
+/* ─── MESSAGES ─── */
 function addMessage(role, meta, text) {
     const article = document.createElement("article");
     article.className = `message message-${role}`;
 
     const metaNode = document.createElement("div");
     metaNode.className = "message-meta";
-    metaNode.textContent = meta;
+
+    if (role === "assistant") {
+        metaNode.innerHTML = `<span class="meta-avatar">AI</span> ${meta}`;
+    } else {
+        metaNode.textContent = meta;
+    }
 
     const bubble = document.createElement("div");
     bubble.className = "message-bubble";
@@ -36,6 +83,31 @@ function addMessage(role, meta, text) {
     chatLog.scrollTop = chatLog.scrollHeight;
 }
 
+/* ─── TYPING INDICATOR ─── */
+function showTypingIndicator() {
+    const article = document.createElement("article");
+    article.className = "message message-assistant";
+    article.id = "typing-indicator";
+
+    const metaNode = document.createElement("div");
+    metaNode.className = "message-meta";
+    metaNode.innerHTML = `<span class="meta-avatar">AI</span> Advisor`;
+
+    const bubble = document.createElement("div");
+    bubble.className = "message-bubble typing-indicator";
+    bubble.innerHTML = `<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>`;
+
+    article.append(metaNode, bubble);
+    chatLog.appendChild(article);
+    chatLog.scrollTop = chatLog.scrollHeight;
+}
+
+function hideTypingIndicator() {
+    const indicator = document.getElementById("typing-indicator");
+    if (indicator) indicator.remove();
+}
+
+/* ─── COURSE CARDS ─── */
 const EXTERNAL_ICON_SVG = '<svg class="external-icon" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-3"/><path d="M10 2h4v4"/><path d="M14 2 7 9"/></svg>';
 
 const BOOK_ICON_SVG = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>';
@@ -57,12 +129,11 @@ function addCourseRecommendations(courses) {
 
     const metaNode = document.createElement("div");
     metaNode.className = "message-meta";
-    metaNode.textContent = "Courses";
+    metaNode.innerHTML = `<span class="meta-avatar">AI</span> Courses`;
 
     const panel = document.createElement("div");
     panel.className = "course-panel";
 
-    // Section header with icon
     const header = document.createElement("div");
     header.className = "course-section-header";
     header.innerHTML = `${BOOK_ICON_SVG}<span class="course-section-title">Recommended Courses</span><span class="course-section-source">via Coursera</span>`;
@@ -138,7 +209,14 @@ function showError(message) {
 function setStatus(targetId, value) {
     const target = document.getElementById(targetId);
     if (target) {
-        target.textContent = value;
+        if (targetId === "runtime-state") {
+            const dot = target.querySelector(".status-dot");
+            target.textContent = "";
+            if (dot) target.appendChild(dot);
+            target.appendChild(document.createTextNode(" " + value));
+        } else {
+            target.textContent = value;
+        }
     }
 }
 
@@ -151,8 +229,8 @@ async function loadStatus() {
         }
         setStatus("runtime-state", payload.ready ? "Ready" : "Unavailable");
         setStatus("llm-state", payload.chat_model || "Unknown");
-        setStatus("role-count", payload.graph_nodes != null ? String(payload.graph_nodes) : "-");
-        setStatus("posting-count", payload.graph_edges != null ? String(payload.graph_edges) : "-");
+        setStatus("role-count", payload.graph_nodes != null ? Number(payload.graph_nodes).toLocaleString() : "-");
+        setStatus("posting-count", payload.graph_edges != null ? Number(payload.graph_edges).toLocaleString() : "-");
     } catch (error) {
         setStatus("runtime-state", "Error");
         setStatus("llm-state", "Unknown");
@@ -184,8 +262,12 @@ chatForm.addEventListener("submit", async (event) => {
     addMessage("user", "You", message);
     messageInput.value = "";
 
+    showTypingIndicator();
+
     try {
         const payload = await sendChatRequest({messages: chatHistory});
+
+        hideTypingIndicator();
 
         const assistantText = payload.message || payload.answer;
         if (assistantText) {
@@ -194,6 +276,7 @@ chatForm.addEventListener("submit", async (event) => {
 
         renderAssistantPayload(payload);
     } catch (error) {
+        hideTypingIndicator();
         showError(error.message);
     }
 });
