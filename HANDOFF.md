@@ -17,7 +17,7 @@ See `novelty.md` and `ALL_STEPS.md` for the design, implementation, and evaluati
 1. **Empirical Career Transition Edges** — 18,907 support-filtered `TRANSITIONS_TO` edges learned from training trajectories only
 2. **Skill-Gap-Aware Career Path Ranking** — deterministic owned-skill evidence, ESCO-comparable requirements, and accessible-to-aspirational ordering
 
-Validation and test remain held out. Test results: Hits@5 `0.3702`, Hits@10 `0.5014`, MRR `0.2591`, observation coverage `0.9940`.
+Validation and test remain held out. Direct-edge test baseline: Hits@5 `0.3702`, Hits@10 `0.5014`, MRR `0.2591`. Accepted embedding-smoothed results: Hits@5 `0.3722`, Hits@10 `0.5058`, MRR `0.2617`, source-role coverage `1.0000`, destination coverage `0.9532`.
 
 ---
 
@@ -31,10 +31,12 @@ src/
   graph_build.py              Merge into typed nx.MultiDiGraph; prune; atomic pickle save/load
   embeddings_index.py         Azure embed → ChromaDB; cosine alignment
   karrierewege_preprocessing.py  Stream-clean trajectories; aggregate/add transitions
+  transition_embedding.py     Semantic-neighbour smoothing over train-derived transitions
   skill_gap.py                Skill ownership, comparable requirements, accessibility ranking
   inference_pipeline.py       7-step pipeline (see below)
 evaluation/
   evaluate_karrierewege.py    Held-out transition evaluation
+  evaluate_embedding_transitions.py  Local-only validation-tuned, locked-test experiment
   ranking_ablation.py         Semantic/transition/skill-gap diagnostic ablation
 tests/                        Deterministic offline unit tests
 build_graph.py                CLI: graph, alignment, and transition build modes
@@ -97,6 +99,10 @@ SIMILARITY_THRESHOLD    = 0.65
 ONET_IMPORTANCE_THRESHOLD = 3.5
 TRANSITION_MIN_COUNT    = 5
 TRANSITION_CHUNK_SIZE   = 200000
+TRANSITION_SMOOTHING_ENABLED = true
+TRANSITION_SMOOTHING_NEIGHBOURS = 20
+TRANSITION_SMOOTHING_DIRECT_WEIGHT = 0.90
+TRANSITION_SMOOTHING_TEMPERATURE = 0.05
 KARRIEREWEGE_MAX_INVALID_ROW_RATIO = 0.001
 ```
 
@@ -436,3 +442,14 @@ git push origin dev
 5. **Graph usability** — added responsive navigation/legend, progressive labels, persistent tap/click inspection, viewport-safe hover details, accessible controls, and retryable load failures.
 6. **Validation** — JavaScript syntax, Python compilation, 20 offline unit tests, four local HTTP routes, desktop/tablet/mobile render checks, and blocked-CDN fallback renders passed. `/api/chat` was not invoked during the visual pass to avoid unnecessary external model calls.
 7. **Deployment boundary** — `HANDOFF.md` and `ALL_STEPS.md` are versioned project records but excluded from Vercel uploads; graph and Chroma assets remain local-only pending external database integration.
+
+### Embedding-smoothed transition pass
+
+1. **Why embeddings are used** — title mapping was already complete, so raw Karrierewege rows were not re-embedded. Existing `text-embedding-3-large` ESCO role vectors identify semantically related transition-source roles.
+2. **Leakage boundary** — only graph edges marked `split='train'` contribute destination distributions; validation selects parameters and the frozen configuration is applied to test once.
+3. **Selected configuration** — 20 neighbours, direct-transition weight 0.90, softmax temperature 0.05.
+4. **Locked test improvement** — MRR 0.259056 → 0.261703, Hits@5 0.370239 → 0.372183, Hits@10 0.501359 → 0.505809, and destination coverage 0.871500 → 0.953196.
+5. **Runtime behavior** — direct observations retain counts/probabilities. Smoothed-only roles are marked `semantic_transition_backoff`, shown as inferred evidence, and never represented as directly observed moves.
+6. **Failure behavior** — disabled smoothing, missing vectors, incompatible Chroma data, or scorer errors fall back to the original direct transition expansion.
+7. **Vector scope** — 3,039/3,039 live ESCO vectors loaded in evaluation; runtime preloads only 765 transition-source vectors and caches per-role rankings. No embedding API call or raw person-level embedding is used.
+8. **Verification** — 28 offline tests pass; a mocked `/api/chat` request initialized the real-vector smoother, returned a ranked result, and exposed no smoothing error without calling external models.

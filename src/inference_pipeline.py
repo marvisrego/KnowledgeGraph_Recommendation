@@ -238,10 +238,11 @@ def augment_candidates_with_transitions(
     current_role_id: str | None,
     G: nx.MultiDiGraph,
     limit: int,
+    smoothed_destinations: list | None = None,
 ) -> list[dict]:
-    """Union semantic candidates with empirically observed next roles."""
+    """Union semantic candidates with direct and accepted smoothed transitions."""
     from src.embeddings_index import build_role_text
-    from src.skill_gap import transition_destinations
+    from src.skill_gap import transition_destinations, transition_evidence
 
     combined: dict[str, dict] = {
         str(candidate["id"]): dict(candidate)
@@ -250,13 +251,10 @@ def augment_candidates_with_transitions(
     }
     order = list(combined)
 
-    for empirical in transition_destinations(current_role_id, G, limit=limit):
-        role_id = empirical["id"]
-        if role_id == current_role_id or not G.has_node(role_id):
-            continue
+    def _merge(role_id: str, transition: dict) -> None:
         if role_id in combined:
-            combined[role_id]["transition"] = empirical["transition"]
-            continue
+            combined[role_id]["transition"] = transition
+            return
         data = G.nodes[role_id]
         combined[role_id] = {
             "id": role_id,
@@ -267,9 +265,39 @@ def augment_candidates_with_transitions(
             },
             "document": build_role_text(role_id, data),
             "score": 0.0,
-            "transition": empirical["transition"],
+            "transition": transition,
         }
         order.append(role_id)
+
+    if smoothed_destinations:
+        for raw_item in smoothed_destinations[: max(0, limit)]:
+            item = raw_item.to_dict() if hasattr(raw_item, "to_dict") else dict(raw_item)
+            role_id = str(item.get("id", ""))
+            if not role_id or role_id == current_role_id or not G.has_node(role_id):
+                continue
+            if item.get("evidence_type") == "direct_transition":
+                transition = transition_evidence(current_role_id, role_id, G)
+                if transition:
+                    _merge(role_id, transition)
+                continue
+            if item.get("evidence_type") != "semantic_transition_backoff":
+                continue
+            _merge(
+                role_id,
+                {
+                    "from_role_id": current_role_id,
+                    "evidence_type": "semantic_transition_backoff",
+                    "score": float(item.get("score", 0.0)),
+                    "neighbour_probability": float(item.get("neighbour_probability", 0.0)),
+                    "neighbour_support": int(item.get("neighbour_support", 0)),
+                },
+            )
+    else:
+        for empirical in transition_destinations(current_role_id, G, limit=limit):
+            role_id = empirical["id"]
+            if role_id == current_role_id or not G.has_node(role_id):
+                continue
+            _merge(role_id, empirical["transition"])
 
     return [combined[role_id] for role_id in order]
 
@@ -445,6 +473,9 @@ def _build_context_block(
             extra.append(f"observed_count={int(attrs['count'])}")
         if "probability" in attrs and rel == "TRANSITIONS_TO":
             extra.append(f"observed_probability={float(attrs['probability']):.4f}")
+        if rel == "SEMANTIC_TRANSITION_BACKOFF":
+            extra.append(f"inferred_score={float(attrs.get('score', 0.0)):.4f}")
+            extra.append(f"related_source_roles={int(attrs.get('neighbour_support', 0))}")
         extra_str = f" [{', '.join(extra)}]" if extra else ""
         lines.append(f"  ({src_title}) --[{rel}]--> ({dst_title}){extra_str}")
 
@@ -463,6 +494,7 @@ You are a senior career coach. Respond in exactly 1 short paragraph — 2 to 3 s
 Address the professional directly, name their best-fit next role in **bold**, and briefly mention one strength they have and one skill gap to bridge.
 No headings, no bullet lists. Every role and skill you name MUST appear in the provided graph data.
 Treat empirical transitions as population-level evidence, never as a guaranteed outcome.
+SEMANTIC_TRANSITION_BACKOFF is inferred from training transitions of semantically related source roles; never describe it as a directly observed move.
 """.strip()
 
 
@@ -720,6 +752,7 @@ def run_query(
     collection,
     settings: "Settings",
     history: list[dict] | None = None,
+    transition_smoother=None,
 ) -> dict:
     """Orchestrate the full GraphRAG inference loop.
 
@@ -796,11 +829,21 @@ def run_query(
         return {"message": f"I was unable to search for matching roles: {exc}", "courses": [], "path": {}, "explore": {}, "evidence": public_evidence}
 
     candidates = filter_candidates_to_graph(candidates, G)
+    smoothed_destinations = []
+    if transition_smoother is not None and current_role_id:
+        try:
+            smoothed_destinations = transition_smoother.rank(
+                current_role_id,
+                settings.transition_candidate_limit,
+            )
+        except Exception as exc:
+            print(f"[inference_pipeline] Transition smoothing failed (using direct evidence): {exc}")
     candidates = augment_candidates_with_transitions(
         candidates,
         current_role_id,
         G,
         limit=settings.transition_candidate_limit,
+        smoothed_destinations=smoothed_destinations,
     )
 
     if not candidates:
@@ -814,7 +857,12 @@ def run_query(
         fallback = sorted(
             candidates,
             key=lambda candidate: (
-                -float((candidate.get("transition") or {}).get("probability", 0.0)),
+                -float(
+                    (candidate.get("transition") or {}).get(
+                        "probability",
+                        (candidate.get("transition") or {}).get("score", 0.0),
+                    )
+                ),
                 -float(candidate.get("score", 0.0)),
                 str(candidate.get("id", "")),
             ),
@@ -847,22 +895,33 @@ def run_query(
             transition = candidate.get("transition")
             if not transition or not current_role_id:
                 continue
+            evidence_type = transition.get("evidence_type", "direct_transition")
+            relation = (
+                "SEMANTIC_TRANSITION_BACKOFF"
+                if evidence_type == "semantic_transition_backoff"
+                else "TRANSITIONS_TO"
+            )
             key = (current_role_id, candidate["id"])
-            if key in seen_transition_triples:
+            if relation == "TRANSITIONS_TO" and key in seen_transition_triples:
                 continue
             triples.append(
                 (
                     current_role_id,
-                    "TRANSITIONS_TO",
+                    relation,
                     candidate["id"],
                     {
-                        "relation": "TRANSITIONS_TO",
-                        "source": "karrierewege",
+                        "relation": relation,
+                        "source": (
+                            "embedding_smoothing"
+                            if relation == "SEMANTIC_TRANSITION_BACKOFF"
+                            else "karrierewege"
+                        ),
                         **transition,
                     },
                 )
             )
-            seen_transition_triples.add(key)
+            if relation == "TRANSITIONS_TO":
+                seen_transition_triples.add(key)
     except Exception as exc:
         return {"message": f"Graph traversal failed: {exc}", "courses": [], "path": {}, "explore": {}, "evidence": public_evidence}
 

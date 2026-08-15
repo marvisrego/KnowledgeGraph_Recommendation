@@ -358,7 +358,69 @@ Results:
 - `.agents/`, `.claude/`, raw data, generated artifacts, graph binaries, and the Chroma index remain available locally but excluded from GitHub/Vercel.
 - The Vercel deployment is expected to use externally hosted graph/vector data before the data-backed endpoints can be production-ready.
 
-## 15. Known limitations and next steps
+## 15. Embedding-smoothed transition evaluation and integration (2026-08-15)
+
+### Data decision
+
+Karrierewege title mapping already had complete coverage: 1,284/1,284 training titles, 1,132/1,132 validation titles, and 1,121/1,121 test titles mapped exactly to ESCO. Sampled Karrierewege descriptions and skills were repeated ESCO role content. Re-embedding nearly two million rows would therefore duplicate vectors and overweight common occupations without adding coverage.
+
+The accepted alternative uses existing `text-embedding-3-large` role vectors to find semantically related ESCO source roles, then pools only their training-derived transition distributions:
+
+```text
+hybrid destination score =
+    direct_weight × direct transition probability
+    + (1 - direct_weight) × similarity-weighted neighbour probability
+```
+
+No raw row, person identifier, validation transition, or test transition enters the scorer.
+
+### Validation tuning and locked test
+
+The validation-only grid evaluated 48 deterministic configurations:
+
+- neighbours: 3, 5, 10, 20;
+- direct weight: 0.50, 0.65, 0.80, 0.90;
+- temperature: 0.05, 0.10, 0.20.
+
+Validation selected 20 neighbours, direct weight 0.90, and temperature 0.05. The configuration was frozen before the test split was scored.
+
+| Test metric | Direct baseline | Hybrid | Change |
+|---|---:|---:|---:|
+| MRR | 0.259056 | 0.261703 | +0.002647 |
+| Hits@5 | 0.370239 | 0.372183 | +0.001944 |
+| Hits@10 | 0.501359 | 0.505809 | +0.004450 |
+| Source-role coverage | 0.738878 | 1.000000 | +0.261122 |
+| Destination coverage | 0.871500 | 0.953196 | +0.081697 |
+
+The pre-registered gate passed with no rejection reasons. Two identical prediction/metric passes were deterministic.
+
+### Implementation
+
+- `src/transition_embedding.py` contains training-edge extraction, safe vector loading, deterministic cosine neighbours, hybrid scoring, and the cached runtime scorer.
+- `evaluation/transition_metrics.py` now exposes a shared prediction-map evaluator; the original direct baseline is exactly reproduced.
+- Local `evaluation/evaluate_embedding_transitions.py` performs validation selection, locked test evaluation, acceptance checks, and an aggregate JSON report; it remains ignored with the raw-data research tooling under the deployment-minimal repository policy.
+- `career_kg_web.py` initializes smoothing lazily on the first chat request. Errors are isolated from graph/Chroma readiness and fall back to direct transitions.
+- `src/inference_pipeline.py` adds only the bounded top hybrid destinations before the existing reranker and skill-gap ranking.
+- Direct moves retain observed count/probability. Backoff-only candidates use `SEMANTIC_TRANSITION_BACKOFF` context and `semantic_transition_backoff` UI evidence so inferred moves are never presented as observed.
+- Runtime preloads 765 transition-source vectors rather than all 3,039 ESCO vectors and caches rankings by resolved role.
+
+Command:
+
+```powershell
+python evaluation/evaluate_embedding_transitions.py
+```
+
+The report remains local at `artifacts/karrierewege/embedding_transition_evaluation.json`. It records zero embedding API calls and zero embedded raw Karrierewege rows.
+
+Verification after conditional runtime integration:
+
+- 28/28 offline unit tests passed;
+- Python compilation and both frontend JavaScript syntax checks passed;
+- importing the deployment runtime loaded neither pandas nor the raw Karrierewege preprocessor;
+- a mocked `/api/chat` request exercised real graph/Chroma loading, lazy smoother initialization, and destination ranking without external model calls;
+- `/`, `/graph`, `/api/status`, and `/api/graph-data` returned HTTP 200 after restart.
+
+## 16. Known limitations and next steps
 
 1. ChromaDB contains 4,055 records while the pruned graph contains 3,932 roles. The new retrieval-boundary filter removes the 123 stale IDs safely. A future deployment rebuild should recreate the collection cleanly.
 2. Only 132 directed alignment edges connect ONET and ESCO, so many ONET roles cannot receive comparable ESCO gap evidence.

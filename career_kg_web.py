@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,7 @@ from config import Settings
 from src.graph_store import load_graph
 from src.embeddings_index import load_chroma_collection
 from src.inference_pipeline import run_query
+from src.transition_embedding import RuntimeTransitionSmoother, SmoothingConfig
 
 
 def create_app():
@@ -26,7 +28,15 @@ def create_app():
     settings = Settings.from_env(Path(__file__).resolve().parent)
 
     # --- Lazy-load graph and ChromaDB (once per process) ---
-    _cache: dict[str, Any] = {"graph": None, "collection": None, "error": None}
+    _cache: dict[str, Any] = {
+        "graph": None,
+        "collection": None,
+        "error": None,
+        "transition_smoother": None,
+        "transition_smoother_attempted": False,
+        "transition_smoother_error": None,
+    }
+    _smoother_lock = threading.Lock()
 
     def _load_resources() -> tuple:
         if _cache["graph"] is None:
@@ -40,6 +50,32 @@ def create_app():
             except RuntimeError as exc:
                 _cache["error"] = str(exc)
         return _cache["graph"], _cache["collection"]
+
+    def _load_transition_smoother(G, collection):
+        if not settings.transition_smoothing_enabled or G is None or collection is None:
+            return None
+        if _cache["transition_smoother_attempted"]:
+            return _cache["transition_smoother"]
+        with _smoother_lock:
+            if _cache["transition_smoother_attempted"]:
+                return _cache["transition_smoother"]
+            try:
+                config = SmoothingConfig(
+                    neighbours=settings.transition_smoothing_neighbours,
+                    direct_weight=settings.transition_smoothing_direct_weight,
+                    temperature=settings.transition_smoothing_temperature,
+                )
+                _cache["transition_smoother"] = RuntimeTransitionSmoother(
+                    G,
+                    collection,
+                    config,
+                )
+            except Exception as exc:
+                _cache["transition_smoother_error"] = str(exc)
+                print(f"[career_kg_web] Transition smoothing unavailable: {exc}")
+            finally:
+                _cache["transition_smoother_attempted"] = True
+        return _cache["transition_smoother"]
 
     @app.get("/")
     def index():
@@ -166,6 +202,9 @@ def create_app():
                     )
                     if G else 0
                 ),
+                "transition_smoothing_enabled": settings.transition_smoothing_enabled,
+                "transition_smoothing_loaded": _cache["transition_smoother"] is not None,
+                "transition_smoothing_error": _cache["transition_smoother_error"],
                 "chat_model": settings.chat_model,
                 "embed_model": settings.embed_model,
                 "rerank_model": settings.cohere_rerank_model,
@@ -200,7 +239,15 @@ def create_app():
             ), 503
 
         try:
-            result = run_query(query, G, collection, settings, history=messages)
+            transition_smoother = _load_transition_smoother(G, collection)
+            result = run_query(
+                query,
+                G,
+                collection,
+                settings,
+                history=messages,
+                transition_smoother=transition_smoother,
+            )
             return jsonify({"status": "ok", "message": result["message"], "courses": result.get("courses", []), "path": result.get("path", {}), "explore": result.get("explore", {}), "evidence": result.get("evidence", {})})
         except Exception as exc:
             return jsonify({"status": "error", "message": str(exc)}), 500

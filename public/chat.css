@@ -1098,6 +1098,14 @@ textarea::placeholder {
     color: var(--ink-muted);
 }
 
+.path-transition-proof.is-inferred {
+    color: var(--warn);
+}
+
+.path-transition-proof.is-inferred::before {
+    content: "Inferred · ";
+}
+
 .path-skill-group {
     display: grid;
     gap: 6px;

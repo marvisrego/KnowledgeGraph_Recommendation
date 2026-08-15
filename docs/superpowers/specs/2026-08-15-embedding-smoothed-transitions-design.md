@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-15
 
-**Status:** Approved design
+**Status:** Implemented and accepted by the pre-registered gate
 
 **Target branch:** `dev`
 
@@ -215,7 +215,7 @@ The evaluation command may read configured local Chroma and graph assets but mus
 - Only aggregate training transitions and taxonomy role vectors participate in scoring.
 - Validation/test remain evaluation-only.
 - Graph, Chroma, data files, and evaluation artifacts remain local and ignored by Git/Vercel.
-- Source, tests, design, and aggregate metrics are versioned on `dev`.
+- Runtime source, design, and aggregate metrics are versioned on `dev`. Raw-data evaluation code and tests remain local under the repository's deployment-minimal ignore policy.
 - External graph/vector storage remains the deployment boundary for Vercel.
 
 ## 12. Completion criteria
@@ -230,3 +230,17 @@ The experiment is complete when:
 6. tests and syntax checks pass;
 7. `HANDOFF.md` and `ALL_STEPS.md` document the outcome;
 8. accepted source/documentation changes are committed and pushed to `dev`.
+
+## 13. Measured outcome
+
+Validation selected `k=20`, direct weight `0.90`, and softmax temperature `0.05` from the pre-registered 48-configuration grid. The frozen configuration passed the locked test gate:
+
+| Metric | Direct baseline | Hybrid | Absolute change |
+|---|---:|---:|---:|
+| MRR | 0.259056 | 0.261703 | +0.002647 |
+| Hits@5 | 0.370239 | 0.372183 | +0.001944 |
+| Hits@10 | 0.501359 | 0.505809 | +0.004450 |
+| Source-role coverage | 0.738878 | 1.000000 | +0.261122 |
+| Destination coverage | 0.871500 | 0.953196 | +0.081697 |
+
+All 3,039 live ESCO role vectors loaded successfully at 3,072 dimensions. Runtime initialization uses only the 765 vectorized source roles with retained training transitions, and role-specific rankings are cached. No raw Karrierewege row was embedded and no embedding API call was made during evaluation.

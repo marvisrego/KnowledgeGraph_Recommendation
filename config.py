@@ -62,6 +62,10 @@ class Settings:
     transition_chunk_size: int
     transition_candidate_limit: int
     transition_traversal_limit: int
+    transition_smoothing_enabled: bool
+    transition_smoothing_neighbours: int
+    transition_smoothing_direct_weight: float
+    transition_smoothing_temperature: float
     karrierewege_max_invalid_row_ratio: float
 
     @classmethod
@@ -72,6 +76,12 @@ class Settings:
 
         def _path(key: str, default: str) -> Path:
             return root / os.getenv(key, default)
+
+        def _bool(key: str, default: bool) -> bool:
+            value = os.getenv(key)
+            if value is None:
+                return default
+            return value.strip().casefold() in {"1", "true", "yes", "on"}
 
         return cls(
             # Chat
@@ -120,6 +130,16 @@ class Settings:
             transition_chunk_size=int(os.getenv("TRANSITION_CHUNK_SIZE", "200000")),
             transition_candidate_limit=int(os.getenv("TRANSITION_CANDIDATE_LIMIT", "12")),
             transition_traversal_limit=int(os.getenv("TRANSITION_TRAVERSAL_LIMIT", "8")),
+            transition_smoothing_enabled=_bool("TRANSITION_SMOOTHING_ENABLED", True),
+            transition_smoothing_neighbours=int(
+                os.getenv("TRANSITION_SMOOTHING_NEIGHBOURS", "20")
+            ),
+            transition_smoothing_direct_weight=float(
+                os.getenv("TRANSITION_SMOOTHING_DIRECT_WEIGHT", "0.90")
+            ),
+            transition_smoothing_temperature=float(
+                os.getenv("TRANSITION_SMOOTHING_TEMPERATURE", "0.05")
+            ),
             karrierewege_max_invalid_row_ratio=float(
                 os.getenv("KARRIEREWEGE_MAX_INVALID_ROW_RATIO", "0.001")
             ),

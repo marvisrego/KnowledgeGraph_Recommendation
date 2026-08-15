@@ -349,6 +349,7 @@ def transition_evidence(
     )
     return {
         "from_role_id": source_role_id,
+        "evidence_type": "direct_transition",
         "count": int(best.get("count", 0)),
         "probability": float(best.get("probability", 0.0)),
         "source_total": int(best.get("source_total", 0)),
@@ -371,6 +372,7 @@ def transition_destinations(
                 "id": str(target),
                 "transition": {
                     "from_role_id": source_role_id,
+                    "evidence_type": "direct_transition",
                     "count": int(data.get("count", 0)),
                     "probability": float(data.get("probability", 0.0)),
                     "source_total": int(data.get("source_total", 0)),
@@ -431,7 +433,7 @@ def rank_roles_by_gap(
         return (
             evidence_bucket,
             accessibility_key,
-            -float(transition.get("probability", 0.0)),
+            -float(transition.get("probability", transition.get("score", 0.0))),
             -int(transition.get("count", 0)),
             -candidate["semantic_score"],
             normalize_label(title),

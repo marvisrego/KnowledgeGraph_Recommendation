@@ -500,10 +500,17 @@ function addCareerPath(path) {
         if (role.transition) {
             const transition = document.createElement("div");
             transition.className = "path-transition-proof";
-            const count = Number(role.transition.count || 0).toLocaleString();
-            const probability = (Number(role.transition.probability || 0) * 100).toFixed(1);
-            transition.textContent = count + " observed moves · " + probability + "%";
-            transition.title = "Population-level career transitions observed in the Karrierewege training split";
+            if (role.transition.evidence_type === "semantic_transition_backoff") {
+                const support = Number(role.transition.neighbour_support || 0).toLocaleString();
+                transition.classList.add("is-inferred");
+                transition.textContent = "Semantic transition evidence · " + support + " related roles";
+                transition.title = "Inferred from training transitions of semantically related ESCO roles; not a directly observed move";
+            } else {
+                const count = Number(role.transition.count || 0).toLocaleString();
+                const probability = (Number(role.transition.probability || 0) * 100).toFixed(1);
+                transition.textContent = count + " observed moves · " + probability + "%";
+                transition.title = "Population-level career transitions observed in the Karrierewege training split";
+            }
             evidence.appendChild(transition);
         }
         roleNode.appendChild(evidence);
