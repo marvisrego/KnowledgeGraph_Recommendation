@@ -9,7 +9,7 @@ from typing import Iterable
 
 import networkx as nx
 
-from src.karrierewege_preprocessing import normalize_label
+from src.text_normalization import normalize_label
 
 
 _POSSESSION_MARKERS = re.compile(

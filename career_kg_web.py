@@ -8,7 +8,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).parent))
 
 from config import Settings
-from src.graph_build import load_graph
+from src.graph_store import load_graph
 from src.embeddings_index import load_chroma_collection
 from src.inference_pipeline import run_query
 

@@ -2,9 +2,14 @@
 .env
 /config.toml
 
-# --- Built artifacts (regenerate with build_graph.py --embed) ---
-graph/
-index/
+# --- Precomputed production assets ---
+# The deployed app needs exactly these graph/index files. Keep local backups
+# and alternate builds out of Git.
+graph/*
+!graph/graph.gpickle
+index/*
+!index/chroma/
+!index/chroma/**
 
 # --- Python ---
 __pycache__/
@@ -19,11 +24,16 @@ build/
 # --- Data / raw files ---
 Data/
 
-# --- Misc artifacts ---
-artifacts/career_kg_bundle.pkl
-artifacts/linkedin_kg_bundle.pkl
-artifacts/monster_kg_bundle.pkl
-artifacts/docx_transcripts/
+# --- Local reports, experiments, and generated artifacts ---
+artifacts/
+docs/
+evaluation/
+tests/
+/ALL_STEPS.md
+/ARCHITECTURE.html
+/ARCHITECTURE.md
+/HANDOFF.md
+/novelty.md
 
 
 # --- OS ---

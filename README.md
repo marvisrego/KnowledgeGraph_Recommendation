@@ -1,61 +1,47 @@
 # GraphRAG Career Advisor
 
-An intelligent career guidance chatbot powered by a knowledge graph combining ONET and ESCO career taxonomies. Uses GraphRAG pattern with embeddings, reranking, and graph traversal to provide personalized career recommendations.
+A Flask career-guidance application backed by an ONET, ESCO, and Karrierewege knowledge graph. It combines semantic retrieval, reranking, graph traversal, skill-gap analysis, observed career-transition evidence, and course recommendations.
 
-## What It Does
+## Run locally
 
-- **Career Advising:** Personalized career recommendations for students and professionals
-- **Skill Matching:** Identifies relevant roles based on skills and background
-- **Course Recommendations:** Suggests relevant courses for skill development
-- **Knowledge Graph:** Interactive visualization of career pathways and skill relationships
+1. Install Python 3.13 and the dependencies:
 
-## Architecture
+   ```powershell
+   python -m pip install -r requirements.txt
+   ```
 
-### Core Components
-- **Graph Database:** NetworkX DiGraph (22,259 nodes, 235,501 edges)
-- **Embeddings:** text-embedding-3-large for semantic search
-- **Reranking:** Cohere rerank for candidate ranking
-- **LLM:** GPT-5.4-nano for conversational guidance
+2. Copy `.env.example` to `.env` and add the three API keys.
 
-### 6-Step Pipeline
-1. **route_intent()** — Detect user type; validate context
-2. **retrieve_candidates()** — Semantic search for relevant roles
-3. **rerank_candidates()** — Rank candidates by relevance
-4. **traverse_graph()** — Collect related skills and prerequisites
-5. **generate_response()** — Generate personalized advice
-6. **fetch_coursera_courses()** — Recommend courses
+3. Start the application:
 
-### Knowledge Graph
-- **Nodes:** ONET roles (1,016), ESCO roles (3,039), skills, elements
-- **Edges:** REQUIRES, SIMILAR_TO, BELONGS_TO, BROADER_THAN, NARROWER_THAN, RELATED_TO
+   ```powershell
+   python career_kg_web.py
+   ```
 
-## Quick Start
+4. Open `http://127.0.0.1:8001`.
 
-Set up environment variables and run the Flask server.
+The repository includes the production graph at `graph/graph.gpickle` and its Chroma index at `index/chroma/`. Raw source datasets and experimental outputs are intentionally excluded.
 
-## Project Structure
+## Deploy to Vercel
 
+Connect this repository and deploy the `dev` branch. Vercel detects `app.py` as the Flask entry point. Configure these environment variables in the Vercel project:
+
+- `CHAT_MODEL_API_KEY`
+- `EMBED_MODEL_API_KEY`
+- `COHERE_RERANK_API_KEY`
+
+Common endpoint, model, and ranking settings can be overridden with the optional variables documented in `.env.example`.
+
+## Runtime structure
+
+```text
+app.py                  Vercel Flask entry point
+career_kg_web.py        Routes and application factory
+config.py               Environment-based settings
+coursera_client.py      Course lookup integration
+src/                     Retrieval, graph, and skill-gap pipeline
+templates/               Chat and graph pages
+public/                  Browser JavaScript and CSS
+graph/                   Precomputed knowledge graph
+index/chroma/            Precomputed semantic-search index
 ```
-config.py                  Settings
-src/
-  onet_preprocessing.py    ONET data processing
-  esco_preprocessing.py    ESCO data processing
-  graph_build.py           Graph construction
-  embeddings_index.py      Embeddings and indexing
-  inference_pipeline.py    Query pipeline
-career_kg_web.py           Flask server
-coursera_client.py         Course recommendations
-templates/
-  index.html               Chat interface
-  graph.html               Graph viewer
-public/
-  chat.js / chat.css       Frontend
-```
-
-## Status
-
-Fully functional with pre-computed graph and embeddings.
-
-## Author
-
-marvisrego
