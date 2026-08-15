@@ -35,3 +35,12 @@ skills-lock.json
 
 # --- Local Codex runtime configuration (may contain credentials) ---
 ~/
+
+# --- Local editor and agent tooling ---
+.agents/
+.claude/
+.antigravitycli/
+
+# --- Removed legacy mirrors (root and public/ are authoritative) ---
+CODE/
+static/

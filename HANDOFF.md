@@ -47,7 +47,6 @@ public/chat.css               Frontend CSS
 test_apis.py                  Smoke-test for Azure embed + Cohere rerank
 novelty.md                    Candidate research contributions for thesis paper (pick 1-2)
 ALL_STEPS.md                  Chronological history, implementation, commands, and results
-CODE/                         Clean deployable copy of all source files (git-safe)
 ```
 
 ---
@@ -344,14 +343,13 @@ git push origin main
 ## Known Issues / TODO
 
 - [ ] `vercel.json` still references old `build_vercel_bundle.py` — update to `python build_graph.py --embed` for deployment
-- [ ] `static/` directory mirrors `public/` — redundant, can be deleted
 - [ ] Coursera client scrapes HTML (no API key) — may break if Coursera changes their page structure
 - [ ] `career_kg_chat.py` is gutted (just a comment) — delete if not needed
 - [ ] Knowledge graph viewer uses `cose` layout which is slow for >300 nodes — consider pre-computing layout positions and caching as JSON
 - [ ] SIMILAR_TO edges are now only 66 pairs (threshold 0.65) — may be too few for cross-framework traversal; monitor recommendation quality and lower threshold to 0.60 if needed
 - [ ] ONET roles have NO ISCO codes in the graph (0/893). ESCO roles all have them (3039/3039). Need SOC→ISCO-08 crosswalk from BLS for contribution #3.
 - [ ] ChromaDB contains 4,055 records while the pruned graph has 3,932 roles. Runtime filtering prevents invalid candidates; rebuild the role index later to remove the 123 stale records.
-- [ ] `CODE/` is a historical deployable mirror and was not synchronized with the 2026-08-15 root implementation; use the repository-root files as authoritative.
+- [x] Repository-local `.agents/`, `.claude/`, `CODE/`, and `static/` directories were removed after the UI audit. They were editor tooling or stale duplicates; the repository root and `public/` remain authoritative.
 
 ---
 

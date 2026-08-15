@@ -318,6 +318,6 @@ python career_kg_web.py
 6. The four-case ranking diagnostic demonstrates mechanics, not statistically general recommendation superiority.
 7. Coursera integration remains an HTML scraper and may change independently.
 8. A larger expert/user evaluation should assess relevance, trust, usefulness, and fairness.
-9. `CODE/` remains a historical mirror and was not synchronized; the repository-root implementation is authoritative.
+9. The repository-local `.agents/`, `.claude/`, stale `CODE/` mirror, and unused `static/` asset copy were removed after the frontend audit. The repository root and `public/` are authoritative.
 
 The pre-enrichment graph backup can be restored manually if needed; no automatic rollback command was added because broad destructive file operations should remain explicit.
