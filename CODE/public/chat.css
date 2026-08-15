@@ -1,0 +1,515 @@
+:root {
+    --bg-base: #0E1117;
+    --bg-surface: #161B24;
+    --bg-raised: #1C2333;
+    --ink: #E8EDF2;
+    --ink-soft: #7A8A9F;
+    --ink-faint: #3D4E62;
+    --accent: #4E8EE8;
+    --accent-dim: rgba(78, 142, 232, 0.15);
+    --accent-hover: #6BA3F0;
+    --warn: #F59E0B;
+    --warn-dim: rgba(245, 158, 11, 0.12);
+    --success: #34D399;
+    --error: #F87171;
+    --error-dim: rgba(248, 113, 113, 0.1);
+    --radius: 10px;
+    --radius-sm: 6px;
+    --font: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    color: var(--ink);
+    background-color: var(--bg-base);
+    font-family: var(--font);
+    font-weight: 400;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+}
+
+.app-shell {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(300px, 380px) minmax(440px, 1fr);
+    gap: 20px;
+    width: min(1280px, calc(100% - 48px));
+    margin: 32px auto;
+    padding-bottom: 32px;
+}
+
+.hero-panel,
+.chat-panel {
+    border: 1px solid var(--ink-faint);
+    border-radius: var(--radius);
+    background: var(--bg-surface);
+    position: relative;
+}
+
+.hero-panel {
+    position: sticky;
+    top: 32px;
+    align-self: start;
+    padding: 32px;
+}
+
+.eyebrow,
+.status-label,
+.composer-label {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--ink-soft);
+}
+
+h1, h2, h3 {
+    margin: 0;
+    font-family: var(--font);
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: -0.02em;
+}
+
+h1 {
+    margin-top: 12px;
+    font-size: 2rem;
+    line-height: 1.2;
+}
+
+h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.hero-copy {
+    margin: 16px 0 28px;
+    font-size: 0.92rem;
+    color: var(--ink-soft);
+    line-height: 1.7;
+}
+
+.graph-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 24px;
+    padding: 10px 18px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--ink-faint);
+    background: var(--bg-raised);
+    color: var(--ink-soft);
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.15s ease;
+}
+.graph-btn:hover {
+    border-color: var(--accent);
+    color: var(--ink);
+    background: var(--accent-dim);
+}
+
+.status-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.status-card {
+    padding: 16px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-raised);
+    border: 1px solid transparent;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    transition: border-color 0.2s ease;
+}
+
+.status-card:hover {
+    border-color: var(--ink-faint);
+}
+
+.status-card strong {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+/* Chat Panel */
+.chat-panel {
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100vh - 64px);
+    padding: 28px;
+}
+
+.chat-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--ink-faint);
+}
+
+.ghost-button,
+.send-button {
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-family: var(--font);
+    font-weight: 500;
+    font-size: 0.85rem;
+}
+
+.ghost-button {
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-raised);
+    color: var(--ink-soft);
+}
+
+.ghost-button:hover {
+    background: var(--ink-faint);
+    color: var(--ink);
+}
+
+.send-button {
+    padding: 12px 24px;
+    border-radius: var(--radius-sm);
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+}
+
+.send-button:hover {
+    background: var(--accent-hover);
+}
+
+.chat-log {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 24px 0;
+    overflow-y: auto;
+}
+
+.chat-log::-webkit-scrollbar {
+    width: 5px;
+}
+.chat-log::-webkit-scrollbar-track {
+    background: transparent;
+}
+.chat-log::-webkit-scrollbar-thumb {
+    background: var(--ink-faint);
+    border-radius: 10px;
+}
+.chat-log::-webkit-scrollbar-thumb:hover {
+    background: var(--ink-soft);
+}
+
+.message {
+    display: grid;
+    gap: 6px;
+    max-width: 88%;
+    animation: fadeIn 0.3s ease-out forwards;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.message-user {
+    align-self: end;
+}
+
+.message-assistant {
+    align-self: start;
+}
+
+.message-meta {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-soft);
+}
+
+.message-bubble {
+    padding: 16px 20px;
+    border-radius: var(--radius);
+    border: 1px solid transparent;
+    font-size: 0.95rem;
+    line-height: 1.7;
+}
+
+.message-user .message-bubble {
+    background: var(--accent-dim);
+    border-color: rgba(78, 142, 232, 0.25);
+    color: var(--ink);
+    border-bottom-right-radius: 2px;
+}
+
+.message-assistant .message-bubble {
+    background: var(--bg-raised);
+    border-color: var(--ink-faint);
+    color: var(--ink);
+    border-bottom-left-radius: 2px;
+}
+
+.message-assistant.intro .message-bubble {
+    background: var(--accent-dim);
+    border-color: rgba(78, 142, 232, 0.2);
+}
+
+/* Markdown content inside message bubbles */
+.message-bubble p {
+    margin: 0 0 0.6em 0;
+}
+.message-bubble p:last-child {
+    margin-bottom: 0;
+}
+.message-bubble strong {
+    color: #fff;
+    font-weight: 600;
+}
+.message-bubble a {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+.message-bubble a:hover {
+    color: var(--accent-hover);
+}
+.message-bubble ul, .message-bubble ol {
+    margin: 0.4em 0;
+    padding-left: 1.4em;
+}
+.message-bubble li {
+    margin-bottom: 0.3em;
+}
+
+/* Composer */
+.composer {
+    display: grid;
+    gap: 10px;
+    padding-top: 20px;
+    border-top: 1px solid var(--ink-faint);
+}
+
+.composer-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    align-items: stretch;
+}
+
+textarea {
+    width: 100%;
+    border: 1px solid var(--ink-faint);
+    background: var(--bg-raised);
+    color: var(--ink);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    font-family: var(--font);
+    font-size: 0.92rem;
+    resize: vertical;
+    transition: border-color 0.15s ease;
+}
+
+textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+textarea::placeholder {
+    color: var(--ink-soft);
+    opacity: 0.7;
+}
+
+/* Error banner */
+.error-banner {
+    padding: 14px 16px;
+    border-radius: var(--radius-sm);
+    background: var(--error-dim);
+    color: var(--error);
+    border: 1px solid rgba(248, 113, 113, 0.25);
+    font-size: 0.88rem;
+}
+
+/* Coursera Course Cards */
+.message-courses {
+    max-width: 100%;
+}
+
+.course-panel {
+    margin-top: 8px;
+    padding: 20px;
+    border-radius: var(--radius);
+    background: var(--bg-surface);
+    border: 1px solid var(--ink-faint);
+}
+
+.course-section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--ink-faint);
+}
+
+.course-section-header svg {
+    flex-shrink: 0;
+    color: var(--accent);
+}
+
+.course-section-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--ink-soft);
+}
+
+.course-section-source {
+    font-size: 0.75rem;
+    color: var(--ink-faint);
+    margin-left: auto;
+}
+
+.course-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+}
+
+.course-card {
+    display: flex;
+    flex-direction: column;
+    padding: 18px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-raised);
+    border: 1px solid transparent;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.course-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent);
+}
+
+.course-card-header {
+    margin-bottom: 12px;
+}
+
+.course-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 4px;
+    line-height: 1.35;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+.course-title .external-icon {
+    flex-shrink: 0;
+    margin-top: 2px;
+    opacity: 0.5;
+}
+
+.course-card:hover .course-title .external-icon {
+    opacity: 1;
+    color: var(--accent);
+}
+
+.course-provider {
+    font-size: 0.8rem;
+    color: var(--ink-soft);
+    margin: 0;
+}
+
+.course-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.course-chip {
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    background: var(--accent-dim);
+    color: var(--accent);
+    text-transform: capitalize;
+}
+
+.course-summary {
+    font-size: 0.83rem;
+    line-height: 1.5;
+    color: var(--ink-soft);
+    margin: auto 0 0 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .app-shell {
+        grid-template-columns: 1fr;
+    }
+    .hero-panel {
+        position: relative;
+        top: 0;
+    }
+    .chat-panel {
+        min-height: auto;
+    }
+}
+
+@media (max-width: 720px) {
+    .app-shell {
+        width: 100%;
+        margin: 0;
+        padding: 12px;
+        gap: 12px;
+    }
+    .hero-panel,
+    .chat-panel {
+        border-radius: var(--radius-sm);
+        padding: 20px;
+    }
+    .composer-row {
+        grid-template-columns: 1fr;
+    }
+    .message {
+        max-width: 100%;
+    }
+    .status-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+    .course-grid {
+        grid-template-columns: 1fr;
+    }
+}

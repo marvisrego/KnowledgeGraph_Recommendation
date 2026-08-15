@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Career Graph Studio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='chat.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <main class="app-shell">
+        <section class="hero-panel">
+            <p class="eyebrow">Career Advisor</p>
+            <h1>Career Graph Studio</h1>
+            <p class="hero-copy">
+                Get personalised career guidance grounded in ONET and ESCO occupational data.
+                Describe your background and goals to receive tailored role recommendations,
+                skill gap analysis, and learning resources.
+            </p>
+            <a href="/graph" target="_blank" class="graph-btn">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="12" cy="18" r="3"/><path d="M6 9v3a6 6 0 0 0 6 6"/><path d="M18 9v3a6 6 0 0 0-6 6"/></svg>
+                Explore Knowledge Graph
+            </a>
+
+            <div class="status-grid">
+                <article class="status-card">
+                    <span class="status-label">Status</span>
+                    <strong id="runtime-state">Loading...</strong>
+                </article>
+                <article class="status-card">
+                    <span class="status-label">Model</span>
+                    <strong id="llm-state">Checking...</strong>
+                </article>
+                <article class="status-card">
+                    <span class="status-label">Nodes</span>
+                    <strong id="role-count">-</strong>
+                </article>
+                <article class="status-card">
+                    <span class="status-label">Edges</span>
+                    <strong id="posting-count">-</strong>
+                </article>
+            </div>
+        </section>
+
+        <section class="chat-panel">
+            <div class="chat-toolbar">
+                <div>
+                    <h2>Career Advisor</h2>
+                </div>
+                <button class="ghost-button" id="clear-chat" type="button">New Chat</button>
+            </div>
+
+            <div class="chat-log" id="chat-log" aria-live="polite">
+                <article class="message message-assistant intro">
+                    <div class="message-meta">Advisor</div>
+                    <div class="message-bubble">
+                        Hi! I'm here to help you explore career paths. Tell me about your background — your degree or current role, your key skills, and what you're aiming for — and I'll suggest roles that fit, highlight any skill gaps, and point you toward relevant courses.
+                    </div>
+                </article>
+            </div>
+
+            <form class="composer" id="chat-form">
+                <label class="composer-label" for="message-input">What are you looking for?</label>
+                <div class="composer-row">
+                    <textarea id="message-input" name="message" rows="3" placeholder="Describe your background and what you're aiming for..." required></textarea>
+                    <button class="send-button" type="submit">Get Advice</button>
+                </div>
+            </form>
+        </section>
+    </main>
+
+    <script src="{{ url_for('static', filename='chat.js') }}"></script>
+</body>
+</html>

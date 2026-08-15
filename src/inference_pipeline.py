@@ -114,19 +114,26 @@ INSUFFICIENT — always ask follow-up questions for:
 - Any message that does not clearly establish BOTH background AND goal.
 
 ---
-RESPONSE FORMAT — pure JSON only, no markdown, no code fences:
+EXTRACTION RULES:
+- Copy the current role and skills only from information the USER explicitly provided.
+- Never infer that the user has a skill merely because it belongs to their desired role.
+- Exclude skills the user says they do not have or still need to learn.
+- Use an empty string or empty list when a field is unavailable.
+
+RESPONSE FORMAT — pure JSON only, no markdown, no code fences. Always include
+current_role, skills, and career_goal:
 
 If user type is UNKNOWN (cannot tell if student or professional):
-{"has_context": false, "user_type": "unknown", "followup_questions": "Are you currently a student or a working professional?\nWhat is your current role or field of study?\nWhat kind of career guidance are you looking for?"}
+{"has_context": false, "user_type": "unknown", "current_role": "", "skills": [], "career_goal": "", "followup_questions": "Are you currently a student or a working professional?\nWhat is your current role or field of study?\nWhat kind of career guidance are you looking for?"}
 
 If user type is STUDENT but context is insufficient:
-{"has_context": false, "user_type": "student", "followup_questions": "What degree or subject are you studying (or did you recently graduate in)?\nWhat skills, tools, or areas interest you most?\nWhat kind of roles or industry are you hoping to enter?"}
+{"has_context": false, "user_type": "student", "current_role": "", "skills": ["<explicitly stated skill>"], "career_goal": "", "followup_questions": "What degree or subject are you studying (or did you recently graduate in)?\nWhat skills, tools, or areas interest you most?\nWhat kind of roles or industry are you hoping to enter?"}
 
 If user type is PROFESSIONAL but context is insufficient:
-{"has_context": false, "user_type": "professional", "followup_questions": "What is your current job title and how many years of experience do you have?\nWhat are your main skills or technologies?\nAre you looking to switch roles, upskill, change industry, or get promoted?"}
+{"has_context": false, "user_type": "professional", "current_role": "<explicit role or empty>", "skills": ["<explicitly stated skill>"], "career_goal": "", "followup_questions": "What is your current job title and how many years of experience do you have?\nWhat are your main skills or technologies?\nAre you looking to switch roles, upskill, change industry, or get promoted?"}
 
 If context is sufficient:
-{"has_context": true, "user_type": "<student|professional>"}
+{"has_context": true, "user_type": "<student|professional>", "current_role": "<explicit current role or empty for student>", "skills": ["<explicitly owned skill>"], "career_goal": "<explicit goal>"}
 """.strip()
 
 
@@ -151,7 +158,13 @@ def route_intent(query: str, settings: "Settings", history: list[dict] | None = 
         raw = _call_chat(messages, settings, max_tokens=2000)
         return json.loads(raw)
     except json.JSONDecodeError:
-        return {"has_context": True, "user_type": "professional"}
+        return {
+            "has_context": True,
+            "user_type": "professional",
+            "current_role": "",
+            "skills": [],
+            "career_goal": "",
+        }
     except RuntimeError:
         raise
 
@@ -202,6 +215,63 @@ def retrieve_candidates(
             }
         )
     return candidates
+
+
+def _user_authored_texts(query: str, history: list[dict] | None) -> list[str]:
+    texts = [
+        str(message.get("content", ""))
+        for message in (history or [])
+        if message.get("role") == "user" and str(message.get("content", "")).strip()
+    ]
+    if not texts or texts[-1].strip() != query.strip():
+        texts.append(query)
+    return texts
+
+
+def filter_candidates_to_graph(candidates: list[dict], G: nx.Graph) -> list[dict]:
+    """Drop stale vector-index hits whose node identifiers are absent from the KG."""
+    return [candidate for candidate in candidates if G.has_node(str(candidate.get("id", "")))]
+
+
+def augment_candidates_with_transitions(
+    candidates: list[dict],
+    current_role_id: str | None,
+    G: nx.MultiDiGraph,
+    limit: int,
+) -> list[dict]:
+    """Union semantic candidates with empirically observed next roles."""
+    from src.embeddings_index import build_role_text
+    from src.skill_gap import transition_destinations
+
+    combined: dict[str, dict] = {
+        str(candidate["id"]): dict(candidate)
+        for candidate in filter_candidates_to_graph(candidates, G)
+        if str(candidate.get("id", "")) != str(current_role_id or "")
+    }
+    order = list(combined)
+
+    for empirical in transition_destinations(current_role_id, G, limit=limit):
+        role_id = empirical["id"]
+        if role_id == current_role_id or not G.has_node(role_id):
+            continue
+        if role_id in combined:
+            combined[role_id]["transition"] = empirical["transition"]
+            continue
+        data = G.nodes[role_id]
+        combined[role_id] = {
+            "id": role_id,
+            "metadata": {
+                "title": data.get("title", role_id),
+                "source": data.get("source", "esco"),
+                "type": data.get("type", "role"),
+            },
+            "document": build_role_text(role_id, data),
+            "score": 0.0,
+            "transition": empirical["transition"],
+        }
+        order.append(role_id)
+
+    return [combined[role_id] for role_id in order]
 
 
 # ---------------------------------------------------------------------------
@@ -256,8 +326,9 @@ def rerank_candidates(
 
 def traverse_graph(
     anchor_ids: list[str],
-    G: nx.DiGraph,
+    G: nx.MultiDiGraph,
     onet_importance_threshold: float = 3.0,
+    transition_limit: int = 8,
 ) -> list[tuple]:
     """Collect graph triples for each anchor node.
 
@@ -279,23 +350,40 @@ def traverse_graph(
         node_data = G.nodes[node_id]
         source = node_data.get("source", "")
 
+        transition_edges: list[tuple[str, dict]] = []
         for _, dst, edge_data in G.out_edges(node_id, data=True):
             rel = edge_data.get("relation", "")
 
             if rel == "REQUIRES":
                 req_level = edge_data.get("requirement_level")
                 if source == "onet":
-                    # Only include edges with importance >= threshold
                     try:
                         if float(req_level) < onet_importance_threshold:
                             continue
                     except (TypeError, ValueError):
                         continue
-                # ESCO: include both essential and optional
+                else:
+                    # ESCO: only essential skills — optional adds noise
+                    if req_level not in ("essential",):
+                        continue
                 _add(node_id, rel, dst, dict(edge_data))
 
             elif rel in ("BELONGS_TO", "BROADER_THAN", "NARROWER_THAN", "SIMILAR_TO"):
                 _add(node_id, rel, dst, dict(edge_data))
+
+            elif rel == "TRANSITIONS_TO" and edge_data.get("source") == "karrierewege":
+                transition_edges.append((str(dst), dict(edge_data)))
+
+        transition_edges.sort(
+            key=lambda item: (
+                -float(item[1].get("probability", 0.0)),
+                -int(item[1].get("count", 0)),
+                str(G.nodes[item[0]].get("title", "")) if G.has_node(item[0]) else item[0],
+                item[0],
+            )
+        )
+        for dst, edge_data in transition_edges[: max(0, transition_limit)]:
+            _add(node_id, "TRANSITIONS_TO", dst, edge_data)
 
         # Include inbound SIMILAR_TO edges (cross-framework alignment)
         for src, _, edge_data in G.in_edges(node_id, data=True):
@@ -312,7 +400,7 @@ def traverse_graph(
 def _build_context_block(
     anchor_ids: list[str],
     triples: list[tuple],
-    G: nx.DiGraph,
+    G: nx.MultiDiGraph,
 ) -> str:
     lines: list[str] = []
 
@@ -353,6 +441,10 @@ def _build_context_block(
             extra.append(f"skill_type={attrs['skill_type']}")
         if "similarity" in attrs:
             extra.append(f"similarity={attrs['similarity']:.2f}")
+        if "count" in attrs and rel == "TRANSITIONS_TO":
+            extra.append(f"observed_count={int(attrs['count'])}")
+        if "probability" in attrs and rel == "TRANSITIONS_TO":
+            extra.append(f"observed_probability={float(attrs['probability']):.4f}")
         extra_str = f" [{', '.join(extra)}]" if extra else ""
         lines.append(f"  ({src_title}) --[{rel}]--> ({dst_title}){extra_str}")
 
@@ -360,44 +452,17 @@ def _build_context_block(
 
 
 _GENERATION_SYSTEM_PROMPT_STUDENT = """
-You are a warm, knowledgeable university careers advisor speaking directly to a student or recent graduate.
-Your recommendations draw EXCLUSIVELY from the ONET and ESCO knowledge graph data provided — never invent roles, skills, or pathways that are not in the graph.
-
-HOW TO WRITE:
-- Speak naturally in flowing paragraphs, as if sitting across from the student in a one-on-one advising session.
-- Address them directly ("Based on your background in…", "You're well-positioned for…").
-- Recommend 2–3 roles maximum. For each, weave in why it fits their profile by referencing graph data naturally (e.g. "this role lists Python as an essential requirement, which lines up with your experience").
-- When mentioning skill gaps, integrate them into your advice conversationally ("To strengthen your candidacy, you'll want to develop…").
-- Use **bold** only for role titles and skill names — never for section headings or structural formatting.
-- Do NOT use markdown headings (##), bullet lists, numbered lists, or horizontal rules.
-- Do NOT use phrases like "According to the graph" or "The ONET data shows" — just state the advice naturally.
-- Keep it concise: 3–4 paragraphs total. Quality over quantity.
-- End with a brief encouraging note about next steps or what to focus on first.
-
-CONSTRAINTS:
-- Every role and skill you mention MUST appear in the provided graph triples or anchor node data.
-- Do NOT invent or hallucinate anything not in the graph.
+You are a university careers advisor. Respond in exactly 1 short paragraph — 2 to 3 sentences only.
+Address the student directly, name their best-fit role in **bold**, and briefly mention one key skill they already have and one to develop.
+No headings, no bullet lists. Every role and skill you name MUST appear in the provided graph data.
+Empirical transitions are population-level observations, not guarantees about an individual.
 """.strip()
 
 _GENERATION_SYSTEM_PROMPT_PROFESSIONAL = """
-You are an experienced career coach speaking directly to a working professional about their next move.
-Your recommendations draw EXCLUSIVELY from the ONET and ESCO knowledge graph data provided — never invent roles, skills, or pathways that are not in the graph.
-
-HOW TO WRITE:
-- Speak naturally in flowing paragraphs, like a trusted senior colleague giving career advice over coffee.
-- Address them directly ("Given your experience in…", "Your background in X puts you in a strong position for…").
-- Recommend 2–3 target roles maximum. For each, explain the fit by weaving in graph data naturally (e.g. "this role requires the same core skills you already have, plus…").
-- For skill gaps, be specific but encouraging ("The main gap I see is… — picking that up would open the door to…").
-- Mention transition difficulty honestly — if a role is a stretch, say so and suggest a stepping-stone path using related roles from the graph.
-- Use **bold** only for role titles and skill names — never for section headings or structural formatting.
-- Do NOT use markdown headings (##), bullet lists, numbered lists, or horizontal rules.
-- Do NOT use phrases like "According to the graph" or "The data shows" — just state the advice naturally.
-- Keep it concise: 3–4 paragraphs total. Quality over quantity.
-- End with a clear "what to do first" recommendation.
-
-CONSTRAINTS:
-- Every role and skill you mention MUST appear in the provided graph triples or anchor node data.
-- Do NOT invent or hallucinate anything not in the graph.
+You are a senior career coach. Respond in exactly 1 short paragraph — 2 to 3 sentences only.
+Address the professional directly, name their best-fit next role in **bold**, and briefly mention one strength they have and one skill gap to bridge.
+No headings, no bullet lists. Every role and skill you name MUST appear in the provided graph data.
+Treat empirical transitions as population-level evidence, never as a guaranteed outcome.
 """.strip()
 
 
@@ -405,7 +470,7 @@ def generate_response(
     query: str,
     anchor_ids: list[str],
     triples: list[tuple],
-    G: nx.DiGraph,
+    G: nx.MultiDiGraph,
     settings: "Settings",
     user_type: str = "professional",
     history: list[dict] | None = None,
@@ -429,12 +494,12 @@ def generate_response(
     messages.append({"role": "user", "content": f"User query: {query}\n\n{context}"})
 
     try:
-        return _call_chat(messages, settings, max_tokens=4000)
+        return _call_chat(messages, settings, max_tokens=1000)
     except RuntimeError:
         raise
 
 
-def fetch_coursera_courses(anchor_ids: list[str], G: nx.DiGraph, user_type: str) -> list[dict]:
+def fetch_coursera_courses(anchor_ids: list[str], G: nx.MultiDiGraph, user_type: str) -> list[dict]:
     """Fetch Coursera course recommendations as structured data."""
     try:
         from coursera_client import build_search_queries, search_course_recommendations_multi
@@ -451,7 +516,7 @@ def fetch_coursera_courses(anchor_ids: list[str], G: nx.DiGraph, user_type: str)
         if title:
             role_titles.append(title)
         for _, dst, edge in G.out_edges(nid, data=True):
-            if edge.get("relation") == "REQUIRES" and edge.get("requirement_level") in ("essential", "essential/optional"):
+            if edge.get("relation") == "REQUIRES" and edge.get("requirement_level") == "essential":
                 skill_title = G.nodes[dst].get("title", "") if G.has_node(dst) else ""
                 if skill_title:
                     essential_skills.append(skill_title)
@@ -463,11 +528,186 @@ def fetch_coursera_courses(anchor_ids: list[str], G: nx.DiGraph, user_type: str)
     queries = build_search_queries(role_titles[0], essential_skills[:5], fallback)
 
     try:
-        courses = search_course_recommendations_multi(queries, limit=3, timeout=15)
+        courses = search_course_recommendations_multi(queries, limit=5, timeout=15)
     except Exception:
         return []
 
     return courses if courses else []
+
+
+# ---------------------------------------------------------------------------
+# Explore data builder (partial context — separate skills + roles visuals)
+# ---------------------------------------------------------------------------
+
+def _build_explore_data(anchor_ids: list[str], triples: list[tuple], G: nx.MultiDiGraph) -> dict:
+    """Build separate roles list and skills list for the explore panels shown
+    when the user only provided partial context (e.g. degree only).
+
+    Returns:
+        {
+            "roles":  [{"id", "title", "source", "description", "prep"}, ...],
+            "skills": [{"id", "title", "type"}, ...]   # deduplicated across all anchors
+        }
+    """
+    roles = []
+    seen_skill_ids: dict[str, dict] = {}
+    seen_role_ids = set()
+
+    for nid in anchor_ids:
+        if not G.has_node(nid):
+            continue
+        d = G.nodes[nid]
+        roles.append({
+            "id": nid,
+            "title": d.get("title", nid),
+            "source": d.get("source", ""),
+            "description": (d.get("description") or "")[:120],
+            "prep": d.get("job_zone_title") or d.get("typical_education_level") or "",
+        })
+        seen_role_ids.add(nid)
+
+    for src, rel, dst, attrs in triples:
+        if rel != "REQUIRES" or src not in seen_role_ids:
+            continue
+        if not G.has_node(dst):
+            continue
+        req = attrs.get("requirement_level")
+        # ESCO: essential only; ONET: numeric (already filtered by threshold in traverse_graph)
+        if req not in ("essential",) and not isinstance(req, (int, float)):
+            continue
+        if dst not in seen_skill_ids:
+            d = G.nodes[dst]
+            raw_title = d.get("title", dst)
+            seen_skill_ids[dst] = {
+                "id": dst,
+                "title": raw_title[:38] + "…" if len(raw_title) > 38 else raw_title,
+                "type": d.get("skill_type") or d.get("type") or "skill",
+                "count": 0,
+            }
+        seen_skill_ids[dst]["count"] += 1
+
+    # Sort skills by how many roles require them (most common first), cap at 20
+    skills = sorted(seen_skill_ids.values(), key=lambda s: s["count"], reverse=True)[:20]
+    for sk in skills:
+        sk.pop("count", None)
+
+    return {"roles": roles, "skills": skills}
+
+
+# ---------------------------------------------------------------------------
+# Path data builder (for frontend linear career path visual)
+# ---------------------------------------------------------------------------
+
+def _build_path_data(
+    anchor_ids: list[str],
+    triples: list[tuple],
+    G: nx.MultiDiGraph,
+    ranked_candidates: list[dict] | None = None,
+) -> dict:
+    """Build a flat structure for the frontend linear path component.
+
+    Returns:
+        {
+            "roles": [{"id", "title", "source", "description", "prep"}, ...],
+            "skills": [{"id", "title", "type", "roles": [role_id, ...]}, ...],
+            "similar_pairs": [[role_id_a, role_id_b], ...]
+        }
+    """
+    candidate_by_id = {
+        str(candidate["id"]): candidate for candidate in (ranked_candidates or [])
+    }
+    roles = []
+    seen_role_ids = []
+    for nid in anchor_ids:
+        if not G.has_node(nid):
+            continue
+        d = G.nodes[nid]
+        candidate = candidate_by_id.get(nid, {})
+        skill_gap = candidate.get("skill_gap") or {}
+
+        def _display_items(items: list[dict]) -> list[dict]:
+            displayed = []
+            for item in items:
+                title = str(item.get("title", item.get("id", "")))
+                displayed.append(
+                    {
+                        "id": item.get("id", ""),
+                        "title": title[:38] + "…" if len(title) > 38 else title,
+                    }
+                )
+            return displayed
+
+        roles.append({
+            "id": nid,
+            "title": d.get("title", nid),
+            "source": d.get("source", ""),
+            "description": (d.get("description") or "")[:150],
+            "prep": d.get("job_zone_title") or d.get("typical_education_level") or "",
+            "accessibility": skill_gap.get("accessibility"),
+            "gap": skill_gap.get("gap"),
+            "gap_evidence": skill_gap.get("gap_evidence", "not_calculated"),
+            "required_skill_count": int(skill_gap.get("required_skill_count", 0)),
+            "have_count": int(skill_gap.get("have_count", 0)),
+            "need_count": int(skill_gap.get("need_count", 0)),
+            "have": _display_items(skill_gap.get("have", [])),
+            "need": _display_items(skill_gap.get("need", [])),
+            "transition": candidate.get("transition"),
+            "semantic_score": candidate.get("semantic_score"),
+        })
+        seen_role_ids.append(nid)
+
+    # Collect top-5 skills per role (essential / high importance)
+    skill_map: dict[str, dict] = {}
+    for src, rel, dst, attrs in triples:
+        if rel != "REQUIRES" or src not in seen_role_ids:
+            continue
+        if not G.has_node(dst):
+            continue
+        req = attrs.get("requirement_level")
+        # ESCO: essential only; ONET: numeric (already threshold-filtered in traverse_graph)
+        if req not in ("essential",) and not isinstance(req, (int, float)):
+            continue
+        if dst not in skill_map:
+            d = G.nodes[dst]
+            raw_title = d.get("title", dst)
+            skill_map[dst] = {
+                "id": dst,
+                "title": raw_title[:38] + "…" if len(raw_title) > 38 else raw_title,
+                "type": d.get("skill_type") or d.get("type") or "skill",
+                "roles": [],
+            }
+        if src not in skill_map[dst]["roles"]:
+            skill_map[dst]["roles"].append(src)
+
+    # Cap at 5 skills per role, picking those linked to most roles first
+    skills_sorted = sorted(skill_map.values(), key=lambda s: len(s["roles"]), reverse=True)
+    role_skill_count: dict[str, int] = {rid: 0 for rid in seen_role_ids}
+    selected_skills = []
+    for sk in skills_sorted:
+        include = False
+        for rid in sk["roles"]:
+            if role_skill_count.get(rid, 0) < 5:
+                role_skill_count[rid] = role_skill_count.get(rid, 0) + 1
+                include = True
+        if include:
+            selected_skills.append(sk)
+
+    # SIMILAR_TO pairs between anchor roles
+    similar_pairs = []
+    seen_pairs: set[frozenset] = set()
+    for src, rel, dst, _ in triples:
+        if rel == "SIMILAR_TO" and src in seen_role_ids and dst in seen_role_ids:
+            pair = frozenset([src, dst])
+            if pair not in seen_pairs:
+                seen_pairs.add(pair)
+                similar_pairs.append([src, dst])
+
+    return {
+        "roles": roles,
+        "skills": selected_skills,
+        "similar_pairs": similar_pairs,
+        "ordering": "accessibility_then_transition_then_semantic",
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -476,7 +716,7 @@ def fetch_coursera_courses(anchor_ids: list[str], G: nx.DiGraph, user_type: str)
 
 def run_query(
     query: str,
-    G: nx.DiGraph,
+    G: nx.MultiDiGraph,
     collection,
     settings: "Settings",
     history: list[dict] | None = None,
@@ -490,56 +730,170 @@ def run_query(
         intent = route_intent(query, settings, history=history)
     except RuntimeError as exc:
         print(f"[inference_pipeline] Intent routing failed (continuing): {exc}")
-        intent = {"has_context": True, "user_type": "professional"}
-
-    if not intent.get("has_context", True):
-        msg = intent.get(
-            "followup_questions",
-            "Could you tell me more about your current background and career goals?",
-        )
-        return {"message": msg, "courses": []}
+        intent = {
+            "has_context": True,
+            "user_type": "professional",
+            "current_role": "",
+            "skills": [],
+            "career_goal": "",
+        }
 
     user_type = intent.get("user_type", "professional")
     if user_type not in ("student", "professional"):
         user_type = "professional"
 
-    # 2. Retrieval
+    from src.skill_gap import rank_roles_by_gap, resolve_current_role, resolve_user_skills
+
+    user_texts = _user_authored_texts(query, history)
+    router_skills = intent.get("skills", [])
+    if isinstance(router_skills, str):
+        router_skills = [router_skills]
+    elif not isinstance(router_skills, list):
+        router_skills = []
+    try:
+        skill_evidence = resolve_user_skills(router_skills, user_texts, G)
+        current_role_id = None
+        if user_type == "professional":
+            current_role_id = resolve_current_role(str(intent.get("current_role", "")), G)
+    except Exception as exc:
+        print(f"[inference_pipeline] Skill/role evidence extraction failed (continuing): {exc}")
+        skill_evidence = {
+            "skill_ids": set(),
+            "matched": [],
+            "unmatched": list(router_skills),
+            "excluded": [],
+        }
+        current_role_id = None
+
+    public_evidence = {
+        "current_role": (
+            {
+                "id": current_role_id,
+                "title": G.nodes[current_role_id].get("title", current_role_id),
+            }
+            if current_role_id and G.has_node(current_role_id)
+            else None
+        ),
+        "matched_skills": [
+            {
+                "phrase": item["phrase"],
+                "id": item["id"],
+                "title": item["title"],
+            }
+            for item in skill_evidence["matched"]
+        ],
+        "unmatched_skills": skill_evidence["unmatched"],
+        "excluded_non_owned_skills": skill_evidence.get("excluded", []),
+    }
+
+    # 2. Retrieval (always run — even for partial context)
     try:
         candidates = retrieve_candidates(query, collection, settings)
     except RuntimeError as exc:
-        return {"message": f"I was unable to search for matching roles: {exc}", "courses": []}
+        if not intent.get("has_context", True):
+            msg = intent.get("followup_questions", "Could you tell me more about your background and goals?")
+            return {"message": msg, "courses": [], "path": {}, "explore": {}, "evidence": public_evidence}
+        return {"message": f"I was unable to search for matching roles: {exc}", "courses": [], "path": {}, "explore": {}, "evidence": public_evidence}
+
+    candidates = filter_candidates_to_graph(candidates, G)
+    candidates = augment_candidates_with_transitions(
+        candidates,
+        current_role_id,
+        G,
+        limit=settings.transition_candidate_limit,
+    )
 
     if not candidates:
-        return {"message": "No matching roles were found in the knowledge base for your query.", "courses": []}
+        return {"message": "No matching roles were found in the knowledge base for your query.", "courses": [], "path": {}, "explore": {}, "evidence": public_evidence}
 
     # 3. Reranking
     try:
         top_candidates = rerank_candidates(query, candidates, settings)
     except RuntimeError as exc:
         print(f"[inference_pipeline] Reranking failed (using top retrieval results): {exc}")
-        top_candidates = candidates[: settings.rerank_top_n]
+        fallback = sorted(
+            candidates,
+            key=lambda candidate: (
+                -float((candidate.get("transition") or {}).get("probability", 0.0)),
+                -float(candidate.get("score", 0.0)),
+                str(candidate.get("id", "")),
+            ),
+        )
+        top_candidates = fallback[: settings.rerank_top_n]
+
+    top_candidates = rank_roles_by_gap(
+        skill_evidence["skill_ids"],
+        top_candidates,
+        G,
+        current_role_id=current_role_id,
+    )
 
     anchor_ids = [c["id"] for c in top_candidates]
 
     # 4. Graph traversal
     try:
-        triples = traverse_graph(anchor_ids, G, settings.onet_importance_threshold)
+        triples = traverse_graph(
+            anchor_ids,
+            G,
+            settings.onet_importance_threshold,
+            transition_limit=settings.transition_traversal_limit,
+        )
+        seen_transition_triples = {
+            (source, target)
+            for source, relation, target, _ in triples
+            if relation == "TRANSITIONS_TO"
+        }
+        for candidate in top_candidates:
+            transition = candidate.get("transition")
+            if not transition or not current_role_id:
+                continue
+            key = (current_role_id, candidate["id"])
+            if key in seen_transition_triples:
+                continue
+            triples.append(
+                (
+                    current_role_id,
+                    "TRANSITIONS_TO",
+                    candidate["id"],
+                    {
+                        "relation": "TRANSITIONS_TO",
+                        "source": "karrierewege",
+                        **transition,
+                    },
+                )
+            )
+            seen_transition_triples.add(key)
     except Exception as exc:
-        return {"message": f"Graph traversal failed: {exc}", "courses": []}
+        return {"message": f"Graph traversal failed: {exc}", "courses": [], "path": {}, "explore": {}, "evidence": public_evidence}
+
+    # --- Partial context: show explore visuals + ask follow-up, skip full generation ---
+    if not intent.get("has_context", True):
+        msg = intent.get("followup_questions", "Could you tell me more about your background and goals?")
+        explore_data = _build_explore_data(anchor_ids, triples, G)
+        return {"message": msg, "courses": [], "path": {}, "explore": explore_data, "evidence": public_evidence}
 
     if not triples:
         return {
             "message": "I found some matching roles but could not retrieve supporting details from the knowledge graph.",
-            "courses": [],
+            "courses": [], "path": {}, "explore": {}, "evidence": public_evidence,
         }
 
     # 5. Generation
     try:
         response = generate_response(query, anchor_ids, triples, G, settings, user_type, history=history)
     except RuntimeError as exc:
-        return {"message": f"I encountered an error generating a response: {exc}", "courses": []}
+        return {"message": f"I encountered an error generating a response: {exc}", "courses": [], "path": {}, "explore": {}, "evidence": public_evidence}
 
     # 6. Coursera recommendations (structured data, separate from message)
     courses = fetch_coursera_courses(anchor_ids, G, user_type)
 
-    return {"message": response, "courses": courses}
+    # 7. Build linear path data for frontend visual
+    path_data = _build_path_data(anchor_ids, triples, G, ranked_candidates=top_candidates)
+
+    return {
+        "message": response,
+        "courses": courses,
+        "path": path_data,
+        "explore": {},
+        "evidence": public_evidence,
+    }

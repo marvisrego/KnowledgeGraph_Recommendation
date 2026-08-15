@@ -1,5 +1,6 @@
 # --- Secrets ---
 .env
+/config.toml
 
 # --- Built artifacts (regenerate with build_graph.py --embed) ---
 graph/
@@ -24,10 +25,6 @@ artifacts/linkedin_kg_bundle.pkl
 artifacts/monster_kg_bundle.pkl
 artifacts/docx_transcripts/
 
-# --- Claude / agent internals ---
-.claude/
-.agents/
-.antigravitycli/
 
 # --- OS ---
 .DS_Store
@@ -35,3 +32,6 @@ Thumbs.db
 
 # --- Skills lock (tooling internal) ---
 skills-lock.json
+
+# --- Local Codex runtime configuration (may contain credentials) ---
+~/

@@ -726,6 +726,355 @@ textarea::placeholder {
     animation: msg-enter 0.4s var(--transition-spring) forwards;
 }
 
+/* ─── EXPLORE PANELS (partial context) ─── */
+.message-explore {
+    max-width: 100%;
+}
+
+.explore-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 8px;
+}
+
+.explore-panel {
+    padding: 20px 22px;
+    border-radius: var(--radius);
+    background: rgba(14, 18, 28, 0.6);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(12px);
+}
+
+.explore-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--glass-border);
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--ink-soft);
+}
+
+.explore-panel-header svg {
+    flex-shrink: 0;
+    color: var(--accent);
+}
+
+/* Skills grid — wrapping chips */
+.explore-skill-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.explore-skill-chip {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 500;
+    padding: 5px 12px;
+    border-radius: 100px;
+    background: rgba(129, 140, 248, 0.1);
+    color: var(--accent-secondary);
+    border: 1px solid rgba(129, 140, 248, 0.15);
+    word-break: break-word;
+    transition: all 0.2s ease;
+}
+
+.explore-skill-chip:hover {
+    background: rgba(129, 140, 248, 0.2);
+    border-color: var(--accent-secondary);
+}
+
+/* Roles track — horizontal scroll cards */
+.explore-role-track {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 6px;
+    padding-right: 4px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--ink-faint) transparent;
+}
+
+.explore-role-track::-webkit-scrollbar { height: 3px; }
+.explore-role-track::-webkit-scrollbar-track { background: transparent; }
+.explore-role-track::-webkit-scrollbar-thumb { background: var(--ink-faint); border-radius: 10px; }
+
+.explore-role-card {
+    flex: 0 0 auto;
+    width: 175px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    padding: 14px;
+    border-radius: var(--radius-sm);
+    background: rgba(22, 28, 42, 0.6);
+    border: 1px solid var(--glass-border);
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.explore-role-card:hover {
+    border-color: var(--accent);
+    box-shadow: 0 4px 16px rgba(56, 189, 248, 0.1);
+}
+
+.explore-role-desc {
+    font-size: 0.7rem;
+    color: var(--ink-soft);
+    line-height: 1.45;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-top: 4px;
+    padding-top: 8px;
+    border-top: 1px solid var(--glass-border);
+}
+
+/* ─── CAREER PATH VISUAL ─── */
+.message-path {
+    max-width: 100%;
+}
+
+.path-panel {
+    margin-top: 8px;
+    padding: 20px 22px;
+    border-radius: var(--radius);
+    background: rgba(14, 18, 28, 0.6);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(12px);
+}
+
+.path-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 20px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--glass-border);
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--ink-soft);
+}
+
+.path-header svg {
+    flex-shrink: 0;
+    color: var(--accent);
+}
+
+.path-header-order {
+    margin-left: auto;
+    color: var(--ink-faint);
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+}
+
+.path-track {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    padding-right: 4px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--ink-faint) transparent;
+}
+
+.path-track::-webkit-scrollbar { height: 3px; }
+.path-track::-webkit-scrollbar-track { background: transparent; }
+.path-track::-webkit-scrollbar-thumb { background: var(--ink-faint); border-radius: 10px; }
+
+.path-role {
+    flex: 0 0 auto;
+    width: 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 16px;
+    border-radius: var(--radius-sm);
+    background: rgba(22, 28, 42, 0.6);
+    border: 1px solid var(--glass-border);
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.path-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.path-accessibility-badge {
+    color: var(--success);
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.path-role:hover {
+    border-color: var(--accent);
+    box-shadow: 0 4px 16px rgba(56, 189, 248, 0.1);
+}
+
+.path-source-badge {
+    display: inline-block;
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 2px 7px;
+    border-radius: 100px;
+    width: fit-content;
+}
+
+.path-source-onet {
+    background: rgba(56, 189, 248, 0.12);
+    color: var(--accent);
+    border: 1px solid rgba(56, 189, 248, 0.2);
+}
+
+.path-source-esco {
+    background: rgba(52, 211, 153, 0.1);
+    color: var(--success);
+    border: 1px solid rgba(52, 211, 153, 0.2);
+}
+
+.path-role-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--ink);
+    line-height: 1.35;
+}
+
+.path-role-prep {
+    font-size: 0.72rem;
+    color: var(--ink-soft);
+    line-height: 1.4;
+}
+
+.path-evidence {
+    display: grid;
+    gap: 7px;
+    padding: 9px 0;
+    border-top: 1px solid var(--glass-border);
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.path-readiness {
+    display: grid;
+    gap: 5px;
+}
+
+.path-readiness-label,
+.path-evidence-unavailable,
+.path-transition-proof {
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    line-height: 1.45;
+}
+
+.path-readiness-label,
+.path-evidence-unavailable {
+    color: var(--ink-soft);
+}
+
+.path-readiness-meter {
+    height: 3px;
+    overflow: hidden;
+    border-radius: 100px;
+    background: var(--ink-faint);
+}
+
+.path-readiness-meter span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--success), var(--accent));
+}
+
+.path-transition-proof {
+    color: var(--accent);
+}
+
+.path-transition-proof::before {
+    content: "↗";
+    margin-right: 5px;
+    color: var(--accent-secondary);
+}
+
+.path-skill-group {
+    display: grid;
+    gap: 5px;
+}
+
+.path-skill-label {
+    font-family: var(--font-mono);
+    font-size: 0.55rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.path-skill-label-have { color: var(--success); }
+.path-skill-label-need { color: var(--warn); }
+.path-skill-label-neutral { color: var(--accent-secondary); }
+
+.path-skill-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+}
+
+.path-skill-chip.path-skill-have {
+    background: rgba(52, 211, 153, 0.08);
+    color: var(--success);
+    border-color: rgba(52, 211, 153, 0.18);
+}
+
+.path-skill-chip.path-skill-need {
+    background: rgba(251, 191, 36, 0.08);
+    color: var(--warn);
+    border-color: rgba(251, 191, 36, 0.18);
+}
+
+.path-skill-chip.path-skill-neutral {
+    background: rgba(129, 140, 248, 0.1);
+    color: var(--accent-secondary);
+    border-color: rgba(129, 140, 248, 0.15);
+}
+
+.path-skill-chip {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 100px;
+    background: rgba(129, 140, 248, 0.1);
+    color: var(--accent-secondary);
+    border: 1px solid rgba(129, 140, 248, 0.15);
+    white-space: normal;
+    word-break: break-word;
+    max-width: 100%;
+}
+
+.path-arrow {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    color: var(--ink-faint);
+    padding-top: 28px;
+}
+
 /* ─── COURSERA COURSE CARDS ─── */
 .message-courses {
     max-width: 100%;

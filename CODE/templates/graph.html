@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Knowledge Graph — Career Graph Studio</title>
+    <script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #0E1117;
+            --bg-surface: #161B24;
+            --bg-raised: #1C2333;
+            --ink: #E8EDF2;
+            --ink-soft: #7A8A9F;
+            --ink-faint: #3D4E62;
+            --accent: #4E8EE8;
+            --font: "Inter", -apple-system, sans-serif;
+            --onet: #4E8EE8;
+            --esco: #34D399;
+            --skill: #F59E0B;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: var(--font);
+            background: var(--bg-base);
+            color: var(--ink);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Top bar */
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 0 20px;
+            height: 56px;
+            background: var(--bg-surface);
+            border-bottom: 1px solid var(--ink-faint);
+            flex-shrink: 0;
+            z-index: 10;
+        }
+        .topbar-left { display: flex; align-items: center; gap: 16px; }
+        .back-btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 7px 14px;
+            border-radius: 6px;
+            border: 1px solid var(--ink-faint);
+            background: var(--bg-raised);
+            color: var(--ink-soft);
+            font-family: var(--font);
+            font-size: 0.82rem;
+            font-weight: 500;
+            text-decoration: none;
+            transition: all 0.15s ease;
+        }
+        .back-btn:hover { color: var(--ink); border-color: var(--accent); }
+        .topbar-title { font-size: 0.95rem; font-weight: 600; color: var(--ink); }
+        .topbar-stats { font-size: 0.78rem; color: var(--ink-soft); }
+        .topbar-right { display: flex; align-items: center; gap: 10px; }
+
+        /* Legend */
+        .legend {
+            display: flex; gap: 16px; flex-wrap: wrap; align-items: center;
+        }
+        .legend-item {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 0.75rem; color: var(--ink-soft);
+        }
+        .legend-dot {
+            width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+        }
+
+        /* Controls */
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            z-index: 10;
+        }
+        .ctrl-btn {
+            width: 36px; height: 36px;
+            display: flex; align-items: center; justify-content: center;
+            background: var(--bg-surface);
+            border: 1px solid var(--ink-faint);
+            border-radius: 6px;
+            color: var(--ink-soft);
+            cursor: pointer;
+            font-size: 1.1rem;
+            font-family: var(--font);
+            transition: all 0.15s ease;
+        }
+        .ctrl-btn:hover { color: var(--ink); border-color: var(--accent); }
+
+        /* Tooltip */
+        .tooltip {
+            position: absolute;
+            pointer-events: none;
+            display: none;
+            background: var(--bg-surface);
+            border: 1px solid var(--ink-faint);
+            border-radius: 8px;
+            padding: 12px 16px;
+            max-width: 240px;
+            font-size: 0.82rem;
+            z-index: 20;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        }
+        .tooltip-title { font-weight: 600; color: var(--ink); margin-bottom: 4px; font-size: 0.88rem; }
+        .tooltip-type { font-size: 0.7rem; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+        .tooltip-desc { color: var(--ink-soft); line-height: 1.5; }
+        .tooltip-zone { margin-top: 6px; font-size: 0.75rem; color: var(--ink-faint); }
+
+        /* Graph canvas */
+        #cy {
+            flex: 1;
+            background: var(--bg-base);
+            position: relative;
+        }
+
+        /* Loading overlay */
+        #loading {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-base);
+            z-index: 30;
+            gap: 16px;
+            font-size: 0.9rem;
+            color: var(--ink-soft);
+        }
+        .spinner {
+            width: 36px; height: 36px;
+            border: 2px solid var(--ink-faint);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <header class="topbar">
+        <div class="topbar-left">
+            <a href="/" class="back-btn">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 12L6 8l4-4"/></svg>
+                Back
+            </a>
+            <span class="topbar-title">ONET + ESCO Knowledge Graph</span>
+            <span class="topbar-stats" id="stats-text">Loading…</span>
+        </div>
+        <div class="topbar-right">
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: var(--onet)"></div>
+                    ONET role
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: var(--esco)"></div>
+                    ESCO role
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: var(--skill)"></div>
+                    Skill
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: var(--ink-faint); width:18px; height:2px; border-radius:0;"></div>
+                    REQUIRES
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: var(--accent); width:18px; height:2px; border-radius:0;"></div>
+                    SIMILAR_TO
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div style="position: relative; flex: 1; display: flex; flex-direction: column;">
+        <div id="loading">
+            <div class="spinner"></div>
+            <span>Loading knowledge graph…</span>
+        </div>
+        <div id="cy"></div>
+        <div class="controls">
+            <button class="ctrl-btn" id="btn-fit" title="Fit to screen">⊞</button>
+            <button class="ctrl-btn" id="btn-zoom-in" title="Zoom in">+</button>
+            <button class="ctrl-btn" id="btn-zoom-out" title="Zoom out">−</button>
+        </div>
+    </div>
+    <div class="tooltip" id="tooltip">
+        <div class="tooltip-title" id="tt-title"></div>
+        <div class="tooltip-type" id="tt-type"></div>
+        <div class="tooltip-desc" id="tt-desc"></div>
+        <div class="tooltip-zone" id="tt-zone"></div>
+    </div>
+
+    <script>
+    (async () => {
+        const loading = document.getElementById("loading");
+        const statsText = document.getElementById("stats-text");
+        const tooltip = document.getElementById("tooltip");
+
+        let data;
+        try {
+            const resp = await fetch("/api/graph-data");
+            data = await resp.json();
+        } catch (e) {
+            loading.innerHTML = `<span style="color:#F87171">Failed to load graph data: ${e.message}</span>`;
+            return;
+        }
+
+        const s = data.stats;
+        statsText.textContent = `Showing ${s.shown_nodes} nodes · ${s.shown_edges} edges (sampled from ${s.total_nodes.toLocaleString()} nodes, ${s.total_edges.toLocaleString()} edges total)`;
+
+        const cy = cytoscape({
+            container: document.getElementById("cy"),
+            elements: {
+                nodes: data.nodes,
+                edges: data.edges,
+            },
+            style: [
+                {
+                    selector: "node",
+                    style: {
+                        "label": "data(label)",
+                        "font-family": "Inter, sans-serif",
+                        "font-size": "9px",
+                        "text-valign": "bottom",
+                        "text-margin-y": "5px",
+                        "color": "#7A8A9F",
+                        "text-outline-width": 0,
+                        "width": 18,
+                        "height": 18,
+                    }
+                },
+                {
+                    selector: "node[source='onet']",
+                    style: {
+                        "background-color": "#4E8EE8",
+                        "width": 22, "height": 22,
+                        "color": "#E8EDF2",
+                        "font-size": "10px",
+                    }
+                },
+                {
+                    selector: "node[source='esco'][type='role']",
+                    style: {
+                        "background-color": "#34D399",
+                        "width": 22, "height": 22,
+                        "color": "#E8EDF2",
+                        "font-size": "10px",
+                    }
+                },
+                {
+                    selector: "node[type='skill'], node[type='element'], node[type='skill_group']",
+                    style: {
+                        "background-color": "#F59E0B",
+                        "width": 10, "height": 10,
+                        "color": "#7A8A9F",
+                        "font-size": "8px",
+                    }
+                },
+                {
+                    selector: "edge",
+                    style: {
+                        "width": 1,
+                        "line-color": "#3D4E62",
+                        "target-arrow-color": "#3D4E62",
+                        "target-arrow-shape": "triangle",
+                        "arrow-scale": 0.6,
+                        "curve-style": "bezier",
+                        "opacity": 0.6,
+                    }
+                },
+                {
+                    selector: "edge[relation='SIMILAR_TO']",
+                    style: {
+                        "line-color": "#4E8EE8",
+                        "target-arrow-color": "#4E8EE8",
+                        "width": 1.5,
+                        "opacity": 0.8,
+                    }
+                },
+                {
+                    selector: "node:selected, node.highlighted",
+                    style: {
+                        "border-width": 2,
+                        "border-color": "#fff",
+                        "opacity": 1,
+                    }
+                },
+                {
+                    selector: "node.dimmed, edge.dimmed",
+                    style: { "opacity": 0.08 }
+                },
+            ],
+            layout: {
+                name: "cose",
+                animate: false,
+                nodeDimensionsIncludeLabels: false,
+                nodeRepulsion: 6000,
+                idealEdgeLength: 80,
+                edgeElasticity: 80,
+                gravity: 0.25,
+                numIter: 500,
+                randomize: true,
+            },
+            wheelSensitivity: 0.3,
+            minZoom: 0.1,
+            maxZoom: 4,
+        });
+
+        loading.style.display = "none";
+
+        // Tooltip on hover
+        cy.on("mouseover", "node", (e) => {
+            const n = e.target;
+            const d = n.data();
+            document.getElementById("tt-title").textContent = d.label;
+            document.getElementById("tt-type").textContent = `${d.type || "node"}${d.source ? " · " + d.source.toUpperCase() : ""}`;
+            document.getElementById("tt-desc").textContent = d.description || "";
+            document.getElementById("tt-zone").textContent = d.job_zone ? `Preparation: ${d.job_zone}` : "";
+            tooltip.style.display = "block";
+        });
+        cy.on("mouseout", "node", () => { tooltip.style.display = "none"; });
+        cy.on("mousemove", (e) => {
+            tooltip.style.left = (e.originalEvent.clientX + 16) + "px";
+            tooltip.style.top  = (e.originalEvent.clientY - 8) + "px";
+        });
+
+        // Highlight neighbourhood on click
+        cy.on("tap", "node", (e) => {
+            const clicked = e.target;
+            const neighbourhood = clicked.closedNeighborhood();
+            cy.elements().addClass("dimmed");
+            neighbourhood.removeClass("dimmed").addClass("highlighted");
+        });
+        cy.on("tap", (e) => {
+            if (e.target === cy) {
+                cy.elements().removeClass("dimmed highlighted");
+            }
+        });
+
+        // Controls
+        document.getElementById("btn-fit").addEventListener("click", () => cy.fit(undefined, 40));
+        document.getElementById("btn-zoom-in").addEventListener("click", () => cy.zoom({ level: cy.zoom() * 1.3, renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } }));
+        document.getElementById("btn-zoom-out").addEventListener("click", () => cy.zoom({ level: cy.zoom() * 0.75, renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } }));
+    })();
+    </script>
+</body>
+</html>

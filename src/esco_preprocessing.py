@@ -171,21 +171,34 @@ def _build_occ_skill_edges(esco_dir: Path) -> pd.DataFrame:
 def _build_isco_hierarchy_edges(esco_dir: Path, occ_uris: set[str]) -> pd.DataFrame:
     """BELONGS_TO edges: occupation → isco_group.
     Also BROADER_THAN/NARROWER_THAN between ISCO groups from ISCOGroups.
+
+    The iscoGroup field in occupations_en.csv is a numeric code (e.g. "2511"),
+    but ISCO group nodes are keyed by conceptUri. We resolve the code to URI
+    via ISCOGroups_en.csv so edges actually connect to real nodes.
     """
     occ = _csv(esco_dir, "occupations_en.csv")
     occ = occ[occ["conceptType"] == "Occupation"]
 
+    # Build code → URI lookup
+    ig = _csv(esco_dir, "ISCOGroups_en.csv")
+    code_to_uri: dict[str, str] = dict(
+        zip(ig["code"].astype(str).str.strip(), ig["conceptUri"].astype(str))
+    )
+
     belongs = []
     for _, row in occ.iterrows():
         if pd.notna(row.get("iscoGroup")) and str(row["iscoGroup"]).strip():
-            belongs.append(
-                {
-                    "src": row["conceptUri"],
-                    "dst": str(row["iscoGroup"]).strip(),
-                    "relation": "BELONGS_TO",
-                    "source": "esco",
-                }
-            )
+            code = str(row["iscoGroup"]).strip()
+            isco_uri = code_to_uri.get(code)
+            if isco_uri:
+                belongs.append(
+                    {
+                        "src": row["conceptUri"],
+                        "dst": isco_uri,
+                        "relation": "BELONGS_TO",
+                        "source": "esco",
+                    }
+                )
 
     # ISCO group broader/narrower: use broaderRelationsOccPillar which covers
     # group-level hierarchy too (conceptType == 'ISCOGroup')
@@ -297,24 +310,31 @@ def _build_skill_hierarchy_edges(esco_dir: Path) -> pd.DataFrame:
 
 
 def _build_skill_skill_edges(esco_dir: Path) -> pd.DataFrame:
-    """RELATED_TO / BROADER_THAN edges between skills from skillSkillRelations."""
+    """BROADER_THAN/NARROWER_THAN edges between skills from skillSkillRelations.
+
+    RELATED_TO edges are generic taxonomy links that add noise without helping
+    career recommendations — only structural hierarchy edges are kept.
+    """
     ss = _csv(esco_dir, "skillSkillRelations_en.csv")
 
-    def _rel_label(raw: str) -> str:
+    def _rel_label(raw: str) -> str | None:
         r = str(raw).strip().lower()
         if "broader" in r:
             return "BROADER_THAN"
         if "narrower" in r:
             return "NARROWER_THAN"
-        return "RELATED_TO"
+        return None  # RELATED_TO — excluded
 
     edges = []
     for _, row in ss.iterrows():
+        rel = _rel_label(row["relationType"])
+        if rel is None:
+            continue
         edges.append(
             {
                 "src": row["originalSkillUri"],
                 "dst": row["relatedSkillUri"],
-                "relation": _rel_label(row["relationType"]),
+                "relation": rel,
                 "source": "esco",
                 "pillar": "skills",
             }

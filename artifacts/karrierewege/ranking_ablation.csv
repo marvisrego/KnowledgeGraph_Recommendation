@@ -1,0 +1,5 @@
+case,baseline_first_accessibility,full_first_accessibility,first_role_accessibility_gain,accessibility_order_nonincreasing,transition_candidates_added,transition_supported_shortlist_roles,baseline_accessibility_inversions,transition_only_accessibility_inversions,full_accessibility_inversions,accessibility_inversions_removed,baseline_top3_accessibility_mean,full_top3_accessibility_mean
+professional_data,0.031746031746031744,0.031746031746031744,0.0,True,2,0,0,0,0,0,0.015873015873015872,0.015873015873015872
+professional_software,0.06451612903225806,0.06451612903225806,0.0,True,8,1,0,0,0,0,0.06451612903225806,0.04233870967741935
+professional_project,0.09523809523809523,0.09523809523809523,0.0,True,11,1,4,4,0,4,0.06613756613756613,0.06492504409171075
+student_computing,0.06451612903225806,0.06451612903225806,0.0,True,0,0,1,1,0,1,0.04019457245263697,0.03605564089435057

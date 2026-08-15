@@ -84,7 +84,8 @@ def create_app():
             }})
 
         def _add_edge(src, dst, attrs):
-            eid = f"{src}__{dst}"
+            relation = attrs.get("relation", "EDGE")
+            eid = f"{src}__{relation}__{dst}"
             if eid in seen_edges:
                 return
             seen_edges.add(eid)
@@ -101,6 +102,27 @@ def create_app():
             for _, dst, ed in G.out_edges(src, data=True):
                 if ed.get("relation") == "SIMILAR_TO" and dst in sampled_roles:
                     _add_edge(src, dst, {"relation": "SIMILAR_TO", "similarity": round(ed.get("similarity", 0), 2)})
+
+        # Strongest empirical transitions between sampled roles, globally capped.
+        transition_edges = []
+        for src in sampled_roles:
+            for _, dst, ed in G.out_edges(src, data=True):
+                if ed.get("relation") == "TRANSITIONS_TO" and dst in sampled_roles:
+                    transition_edges.append((src, dst, ed))
+        transition_edges.sort(
+            key=lambda item: (
+                -float(item[2].get("probability", 0.0)),
+                -int(item[2].get("count", 0)),
+                str(item[0]),
+                str(item[1]),
+            )
+        )
+        for src, dst, ed in transition_edges[:120]:
+            _add_edge(src, dst, {
+                "relation": "TRANSITIONS_TO",
+                "count": int(ed.get("count", 0)),
+                "probability": round(float(ed.get("probability", 0.0)), 4),
+            })
 
         # Top-4 essential REQUIRES edges per role, skill nodes capped at 160
         for nid in sampled_roles:
@@ -136,6 +158,14 @@ def create_app():
                 "chroma_loaded": collection is not None,
                 "graph_nodes": G.number_of_nodes() if G else 0,
                 "graph_edges": G.number_of_edges() if G else 0,
+                "transition_edges": (
+                    sum(
+                        1
+                        for _, _, data in G.edges(data=True)
+                        if data.get("relation") == "TRANSITIONS_TO"
+                    )
+                    if G else 0
+                ),
                 "chat_model": settings.chat_model,
                 "embed_model": settings.embed_model,
                 "rerank_model": settings.cohere_rerank_model,
@@ -171,7 +201,7 @@ def create_app():
 
         try:
             result = run_query(query, G, collection, settings, history=messages)
-            return jsonify({"status": "ok", "message": result["message"], "courses": result.get("courses", [])})
+            return jsonify({"status": "ok", "message": result["message"], "courses": result.get("courses", []), "path": result.get("path", {}), "explore": result.get("explore", {}), "evidence": result.get("evidence", {})})
         except Exception as exc:
             return jsonify({"status": "error", "message": str(exc)}), 500
 

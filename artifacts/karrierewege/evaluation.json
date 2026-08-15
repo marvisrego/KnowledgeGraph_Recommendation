@@ -1,0 +1,179 @@
+{
+  "policy": {
+    "training_split": "train",
+    "evaluated_splits": [
+      "validation",
+      "test"
+    ],
+    "graph_transition_edges": 18907,
+    "max_invalid_row_ratio": 0.001
+  },
+  "splits": {
+    "validation": {
+      "quality": {
+        "split": "validation",
+        "source_file": "karierewege_validation.csv",
+        "raw_rows": 248465,
+        "trajectories": 56909,
+        "accepted_steps": 248463,
+        "invalid_rows": 0,
+        "missing_person_ids": 0,
+        "invalid_orders": 0,
+        "missing_titles": 0,
+        "exact_duplicate_rows": 0,
+        "ambiguous_positions": 1,
+        "ambiguous_rows": 2,
+        "out_of_order_trajectories": 0,
+        "nonconsecutive_pairs": 0,
+        "self_transitions": 68034,
+        "valid_transitions": 123520,
+        "distinct_transition_pairs": 27460,
+        "unique_titles": 1132,
+        "mapped_titles": 1132,
+        "unmapped_titles": [],
+        "support_retention": {
+          "1": {
+            "edges": 27460,
+            "observations": 123520,
+            "observation_ratio": 1.0
+          },
+          "2": {
+            "edges": 10170,
+            "observations": 106230,
+            "observation_ratio": 0.8600226683937824
+          },
+          "3": {
+            "edges": 6216,
+            "observations": 98322,
+            "observation_ratio": 0.7960006476683937
+          },
+          "5": {
+            "edges": 3583,
+            "observations": 89505,
+            "observation_ratio": 0.7246194948186528
+          },
+          "10": {
+            "edges": 1783,
+            "observations": 77964,
+            "observation_ratio": 0.6311852331606218
+          },
+          "25": {
+            "edges": 685,
+            "observations": 61669,
+            "observation_ratio": 0.49926327720207253
+          }
+        }
+      },
+      "metrics": {
+        "split": "validation",
+        "observations": 123520,
+        "distinct_pairs": 27460,
+        "source_roles": 1038,
+        "covered_source_roles": 763,
+        "source_role_coverage": 0.7350674373795761,
+        "covered_observations": 122802,
+        "observation_coverage": 0.9941871761658031,
+        "ranked_destination_observations": 107548,
+        "destination_coverage": 0.8706930051813472,
+        "mrr": 0.2585685897246266,
+        "covered_only_mrr": 0.2600803912215263,
+        "hits_at_1": 0.1458387305699482,
+        "hits_at_3": 0.28520077720207254,
+        "hits_at_5": 0.37162402849740933,
+        "hits_at_10": 0.5045174870466321,
+        "covered_only_hits_at_1": 0.14669142196381166,
+        "covered_only_hits_at_3": 0.2868682920473608,
+        "covered_only_hits_at_5": 0.373796843699614,
+        "covered_only_hits_at_10": 0.507467305092751,
+        "macro_mrr": 0.1634397215529594,
+        "macro_hits_at_1": 0.11306346441574516,
+        "macro_hits_at_3": 0.18834801570347173,
+        "macro_hits_at_5": 0.22412481879312118,
+        "macro_hits_at_10": 0.26793150094214446
+      }
+    },
+    "test": {
+      "quality": {
+        "split": "test",
+        "source_file": "karrierewege_test.csv",
+        "raw_rows": 247247,
+        "trajectories": 56850,
+        "accepted_steps": 247238,
+        "invalid_rows": 0,
+        "missing_person_ids": 0,
+        "invalid_orders": 0,
+        "missing_titles": 0,
+        "exact_duplicate_rows": 1,
+        "ambiguous_positions": 4,
+        "ambiguous_rows": 8,
+        "out_of_order_trajectories": 0,
+        "nonconsecutive_pairs": 2,
+        "self_transitions": 67468,
+        "valid_transitions": 122918,
+        "distinct_transition_pairs": 27298,
+        "unique_titles": 1121,
+        "mapped_titles": 1121,
+        "unmapped_titles": [],
+        "support_retention": {
+          "1": {
+            "edges": 27298,
+            "observations": 122918,
+            "observation_ratio": 1.0
+          },
+          "2": {
+            "edges": 10097,
+            "observations": 105717,
+            "observation_ratio": 0.8600611789973803
+          },
+          "3": {
+            "edges": 6184,
+            "observations": 97891,
+            "observation_ratio": 0.7963927170959502
+          },
+          "5": {
+            "edges": 3583,
+            "observations": 89182,
+            "observation_ratio": 0.7255406043053092
+          },
+          "10": {
+            "edges": 1788,
+            "observations": 77585,
+            "observation_ratio": 0.6311931531590166
+          },
+          "25": {
+            "edges": 694,
+            "observations": 61453,
+            "observation_ratio": 0.49995118697017527
+          }
+        }
+      },
+      "metrics": {
+        "split": "test",
+        "observations": 122918,
+        "distinct_pairs": 27298,
+        "source_roles": 1034,
+        "covered_source_roles": 764,
+        "source_role_coverage": 0.7388781431334622,
+        "covered_observations": 122179,
+        "observation_coverage": 0.9939878618265836,
+        "ranked_destination_observations": 107123,
+        "destination_coverage": 0.8714996989863161,
+        "mrr": 0.2590564107948408,
+        "covered_only_mrr": 0.26062331417084966,
+        "hits_at_1": 0.14783026082428935,
+        "hits_at_3": 0.28497860362192684,
+        "hits_at_5": 0.37023869571584306,
+        "hits_at_10": 0.5013586293301225,
+        "covered_only_hits_at_1": 0.14872441254225358,
+        "covered_only_hits_at_3": 0.2867022974488251,
+        "covered_only_hits_at_5": 0.37247808543203004,
+        "covered_only_hits_at_10": 0.504391098306583,
+        "macro_mrr": 0.16580109751016844,
+        "macro_hits_at_1": 0.1157511736811953,
+        "macro_hits_at_3": 0.1900870417749083,
+        "macro_hits_at_5": 0.22621205573226819,
+        "macro_hits_at_10": 0.26872356217317356
+      }
+    }
+  }
+}

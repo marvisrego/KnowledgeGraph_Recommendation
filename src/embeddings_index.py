@@ -104,6 +104,11 @@ def _build_role_text(node_id: str, data: dict) -> str:
     return "\n".join(parts)
 
 
+def build_role_text(node_id: str, data: dict) -> str:
+    """Public role-document builder shared by indexing and candidate expansion."""
+    return _build_role_text(node_id, data)
+
+
 def _safe_metadata(data: dict) -> dict:
     """ChromaDB requires metadata values to be str/int/float/bool — coerce lists."""
     safe = {}
@@ -119,7 +124,7 @@ def _safe_metadata(data: dict) -> dict:
     return safe
 
 
-def build_chroma_index(G: nx.DiGraph, settings: "Settings") -> None:
+def build_chroma_index(G: nx.MultiDiGraph, settings: "Settings") -> None:
     """Embed all role nodes and store them in a persistent ChromaDB collection."""
     try:
         import chromadb
@@ -192,7 +197,7 @@ def load_chroma_collection(settings: "Settings"):
 # ---------------------------------------------------------------------------
 
 def compute_alignment_edges(
-    G: nx.DiGraph,
+    G: nx.MultiDiGraph,
     settings: "Settings",
 ) -> list[tuple[str, str, float]]:
     """Compute cosine similarity between ONET and ESCO role embeddings.

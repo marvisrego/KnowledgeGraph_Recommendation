@@ -47,8 +47,10 @@ class Settings:
     # --- File paths ---
     onet_dir: Path
     esco_dir: Path
+    karrierewege_dir: Path
     graph_path: Path
     chroma_dir: Path
+    karrierewege_report_path: Path
 
     # --- Tuning ---
     embed_batch_size: int
@@ -56,6 +58,11 @@ class Settings:
     retrieval_top_k: int
     rerank_top_n: int
     onet_importance_threshold: float
+    transition_min_count: int
+    transition_chunk_size: int
+    transition_candidate_limit: int
+    transition_traversal_limit: int
+    karrierewege_max_invalid_row_ratio: float
 
     @classmethod
     def from_env(cls, root: Path | None = None) -> "Settings":
@@ -94,14 +101,26 @@ class Settings:
                 "ESCO_DIR",
                 "Data/ESCO dataset - v1.2.1 - classification - en - csv",
             ),
+            karrierewege_dir=_path("KARRIEREWEGE_DIR", "Data/Karrierewege"),
             graph_path=_path("GRAPH_PATH", "graph/graph.gpickle"),
             chroma_dir=_path("CHROMA_DIR", "index/chroma"),
+            karrierewege_report_path=_path(
+                "KARRIEREWEGE_REPORT_PATH",
+                "artifacts/karrierewege/data_quality.json",
+            ),
             # Tuning
             embed_batch_size=int(os.getenv("EMBED_BATCH_SIZE", "100")),
             similarity_threshold=float(os.getenv("SIMILARITY_THRESHOLD", "0.85")),
             retrieval_top_k=int(os.getenv("RETRIEVAL_TOP_K", "50")),
-            rerank_top_n=int(os.getenv("RERANK_TOP_N", "5")),
+            rerank_top_n=int(os.getenv("RERANK_TOP_N", "8")),
             onet_importance_threshold=float(
                 os.getenv("ONET_IMPORTANCE_THRESHOLD", "3.0")
+            ),
+            transition_min_count=int(os.getenv("TRANSITION_MIN_COUNT", "5")),
+            transition_chunk_size=int(os.getenv("TRANSITION_CHUNK_SIZE", "200000")),
+            transition_candidate_limit=int(os.getenv("TRANSITION_CANDIDATE_LIMIT", "12")),
+            transition_traversal_limit=int(os.getenv("TRANSITION_TRAVERSAL_LIMIT", "8")),
+            karrierewege_max_invalid_row_ratio=float(
+                os.getenv("KARRIEREWEGE_MAX_INVALID_ROW_RATIO", "0.001")
             ),
         )

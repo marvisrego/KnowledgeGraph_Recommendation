@@ -189,9 +189,245 @@ function addCourseRecommendations(courses) {
     chatLog.scrollTop = chatLog.scrollHeight;
 }
 
+/* ─── EXPLORE PANELS (partial context: skills grid + roles grid) ─── */
+function addExplorePanels(explore) {
+    if (!explore || (!explore.roles || !explore.roles.length) && (!explore.skills || !explore.skills.length)) return;
+
+    const article = document.createElement("article");
+    article.className = "message message-assistant message-explore";
+
+    const metaNode = document.createElement("div");
+    metaNode.className = "message-meta";
+    metaNode.innerHTML = `<span class="meta-avatar">AI</span> Explore`;
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "explore-wrapper";
+
+    // ── Skills panel ──
+    if (explore.skills && explore.skills.length) {
+        const panel = document.createElement("div");
+        panel.className = "explore-panel";
+
+        const header = document.createElement("div");
+        header.className = "explore-panel-header";
+        header.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><span>Skills You May Need</span>`;
+        panel.appendChild(header);
+
+        const grid = document.createElement("div");
+        grid.className = "explore-skill-grid";
+        explore.skills.forEach(sk => {
+            const chip = document.createElement("span");
+            chip.className = "explore-skill-chip";
+            chip.textContent = sk.title;
+            grid.appendChild(chip);
+        });
+        panel.appendChild(grid);
+        wrapper.appendChild(panel);
+    }
+
+    // ── Roles panel ──
+    if (explore.roles && explore.roles.length) {
+        const panel = document.createElement("div");
+        panel.className = "explore-panel";
+
+        const header = document.createElement("div");
+        header.className = "explore-panel-header";
+        header.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg><span>Roles You Could Target</span>`;
+        panel.appendChild(header);
+
+        const track = document.createElement("div");
+        track.className = "explore-role-track";
+        explore.roles.forEach(role => {
+            const card = document.createElement("div");
+            card.className = "explore-role-card";
+
+            const badge = document.createElement("span");
+            badge.className = `path-source-badge path-source-${role.source}`;
+            badge.textContent = role.source.toUpperCase();
+
+            const title = document.createElement("div");
+            title.className = "path-role-title";
+            title.textContent = role.title;
+
+            if (role.prep) {
+                const prep = document.createElement("div");
+                prep.className = "path-role-prep";
+                prep.textContent = role.prep;
+                card.append(badge, title, prep);
+            } else {
+                card.append(badge, title);
+            }
+
+            if (role.description) {
+                const desc = document.createElement("div");
+                desc.className = "explore-role-desc";
+                desc.textContent = role.description;
+                card.appendChild(desc);
+            }
+
+            track.appendChild(card);
+        });
+        panel.appendChild(track);
+        wrapper.appendChild(panel);
+    }
+
+    article.append(metaNode, wrapper);
+    chatLog.appendChild(article);
+    chatLog.scrollTop = chatLog.scrollHeight;
+}
+
+/* ─── CAREER PATH VISUAL ─── */
+function addCareerPath(path) {
+    if (!path || !path.roles || !path.roles.length) return;
+
+    const article = document.createElement("article");
+    article.className = "message message-assistant message-path";
+
+    const metaNode = document.createElement("div");
+    metaNode.className = "message-meta";
+    metaNode.innerHTML = `<span class="meta-avatar">AI</span> Career Path`;
+
+    const panel = document.createElement("div");
+    panel.className = "path-panel";
+
+    const header = document.createElement("div");
+    header.className = "path-header";
+    header.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg><span>Recommended roles</span><span class="path-header-order">accessible → aspirational</span>`;
+    panel.appendChild(header);
+
+    const track = document.createElement("div");
+    track.className = "path-track";
+
+    path.roles.forEach((role, i) => {
+        // Role node
+        const roleNode = document.createElement("div");
+        roleNode.className = "path-role";
+
+        const cardTop = document.createElement("div");
+        cardTop.className = "path-card-top";
+
+        const badge = document.createElement("span");
+        badge.className = `path-source-badge path-source-${role.source}`;
+        badge.textContent = (role.source || "KG").toUpperCase();
+        cardTop.appendChild(badge);
+
+        if (Number.isFinite(role.accessibility)) {
+            const accessBadge = document.createElement("span");
+            accessBadge.className = "path-accessibility-badge";
+            accessBadge.textContent = `${Math.round(role.accessibility * 100)}% ready`;
+            cardTop.appendChild(accessBadge);
+        }
+
+        const title = document.createElement("div");
+        title.className = "path-role-title";
+        title.textContent = role.title;
+
+        if (role.prep) {
+            const prep = document.createElement("div");
+            prep.className = "path-role-prep";
+            prep.textContent = role.prep;
+            roleNode.append(cardTop, title, prep);
+        } else {
+            roleNode.append(cardTop, title);
+        }
+
+        // Evidence rail: one compact place for skill and population transition signals.
+        const evidence = document.createElement("div");
+        evidence.className = "path-evidence";
+        if (Number.isFinite(role.accessibility)) {
+            const readiness = document.createElement("div");
+            readiness.className = "path-readiness";
+            const readinessLabel = document.createElement("div");
+            readinessLabel.className = "path-readiness-label";
+            readinessLabel.textContent = `${role.have_count || 0} of ${role.required_skill_count || 0} required skills matched`;
+            const meter = document.createElement("div");
+            meter.className = "path-readiness-meter";
+            meter.setAttribute("role", "progressbar");
+            meter.setAttribute("aria-label", "Skill readiness");
+            meter.setAttribute("aria-valuemin", "0");
+            meter.setAttribute("aria-valuemax", "100");
+            meter.setAttribute("aria-valuenow", String(Math.round(role.accessibility * 100)));
+            const fill = document.createElement("span");
+            fill.style.width = `${Math.max(0, Math.min(100, role.accessibility * 100))}%`;
+            meter.appendChild(fill);
+            readiness.append(readinessLabel, meter);
+            evidence.appendChild(readiness);
+        } else {
+            const unavailable = document.createElement("div");
+            unavailable.className = "path-evidence-unavailable";
+            unavailable.textContent = role.gap_evidence === "no_user_skills"
+                ? "Add a matching skill to calculate readiness"
+                : "Comparable skill evidence unavailable";
+            evidence.appendChild(unavailable);
+        }
+
+        if (role.transition) {
+            const transition = document.createElement("div");
+            transition.className = "path-transition-proof";
+            const count = Number(role.transition.count || 0).toLocaleString();
+            const probability = (Number(role.transition.probability || 0) * 100).toFixed(1);
+            transition.textContent = `${count} observed moves · ${probability}%`;
+            transition.title = "Observed population-level career transitions in the Karrierewege training split";
+            evidence.appendChild(transition);
+        }
+        roleNode.appendChild(evidence);
+
+        const appendSkillGroup = (label, skills, state) => {
+            if (!skills || !skills.length) return;
+            const group = document.createElement("div");
+            group.className = "path-skill-group";
+            const groupLabel = document.createElement("div");
+            groupLabel.className = `path-skill-label path-skill-label-${state}`;
+            groupLabel.textContent = label;
+            const skillRow = document.createElement("div");
+            skillRow.className = "path-skill-row";
+            skills.forEach(sk => {
+                const chip = document.createElement("span");
+                chip.className = `path-skill-chip path-skill-${state}`;
+                chip.textContent = sk.title;
+                skillRow.appendChild(chip);
+            });
+            group.append(groupLabel, skillRow);
+            roleNode.appendChild(group);
+        };
+
+        appendSkillGroup("Already have", role.have, "have");
+        appendSkillGroup("Develop next", role.need, "need");
+
+        // Backward-compatible fallback for paths built before skill-gap evidence.
+        if ((!role.have || !role.have.length) && (!role.need || !role.need.length)) {
+            const roleSkills = (path.skills || []).filter(s => s.roles.includes(role.id));
+            appendSkillGroup("Role skills", roleSkills, "neutral");
+        }
+
+        track.appendChild(roleNode);
+
+        // Arrow connector between roles (not after last)
+        if (i < path.roles.length - 1) {
+            const arrow = document.createElement("div");
+            arrow.className = "path-arrow";
+            arrow.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>`;
+            track.appendChild(arrow);
+        }
+    });
+
+    panel.appendChild(track);
+    article.append(metaNode, panel);
+    chatLog.appendChild(article);
+    chatLog.scrollTop = chatLog.scrollHeight;
+}
+
 function renderAssistantPayload(payload) {
     const text = payload.message || payload.answer || "No answer returned.";
     addMessage("assistant", "Advisor", text);
+
+    if (payload.explore && (payload.explore.skills || payload.explore.roles)) {
+        addExplorePanels(payload.explore);
+    }
+
+    if (payload.path && payload.path.roles && payload.path.roles.length > 0) {
+        addCareerPath(payload.path);
+    }
 
     if (payload.courses && payload.courses.length > 0) {
         addCourseRecommendations(payload.courses);

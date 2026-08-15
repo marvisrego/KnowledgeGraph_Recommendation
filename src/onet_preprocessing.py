@@ -147,8 +147,14 @@ def _build_interests_map(onet_dir: Path) -> pd.DataFrame:
     return interests
 
 
+_EXCLUDED_DOMAINS = {"Work Values", "Work Styles"}
+
 def _build_element_nodes(onet_dir: Path) -> pd.DataFrame:
-    """Load Content Model Reference as element nodes."""
+    """Load Content Model Reference as element nodes.
+
+    Work Values and Work Styles are personality/preference dimensions, not
+    career-relevant skills — they are excluded to keep the graph clean.
+    """
     cm = _read_xl(onet_dir, "Content Model Reference.xlsx")
     cm = cm.rename(
         columns={"Element ID": "id", "Element Name": "title", "Description": "description"}
@@ -156,6 +162,7 @@ def _build_element_nodes(onet_dir: Path) -> pd.DataFrame:
     cm["type"] = "element"
     cm["source"] = "onet"
     cm["domain"] = cm["id"].apply(_domain_from_element_id)
+    cm = cm[~cm["domain"].isin(_EXCLUDED_DOMAINS)].reset_index(drop=True)
     return cm
 
 

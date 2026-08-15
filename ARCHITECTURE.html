@@ -1,0 +1,1288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GraphRAG Career Advisor - Architecture Explained</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f5f7fa;
+            color: #1a202c;
+            line-height: 1.6;
+        }
+        .container { max-width: 1400px; margin: 0 auto; padding: 40px 20px; }
+        h1 { font-size: 2.8em; margin-bottom: 10px; color: #0f172a; font-weight: 800; }
+        .subtitle { font-size: 1.15em; color: #64748b; margin-bottom: 40px; }
+        h2 {
+            font-size: 2em;
+            margin-top: 50px;
+            margin-bottom: 30px;
+            color: #0f172a;
+            padding-bottom: 15px;
+            border-bottom: 4px solid #3b82f6;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        h2 .emoji { font-size: 2.2em; }
+        h3 { font-size: 1.3em; margin-top: 30px; margin-bottom: 15px; color: #1e293b; font-weight: 700; }
+        .section {
+            background: white;
+            border-radius: 12px;
+            padding: 35px;
+            margin-bottom: 35px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            border-top: 5px solid #3b82f6;
+        }
+
+        /* Colored sections */
+        .section.orange { border-top-color: #f97316; }
+        .section.green { border-top-color: #10b981; }
+        .section.purple { border-top-color: #8b5cf6; }
+        .section.pink { border-top-color: #ec4899; }
+
+        .toc {
+            background: linear-gradient(135deg, #f0f9ff 0%, #ecf0ff 100%);
+            border: 2px solid #bfdbfe;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 40px;
+            position: sticky;
+            top: 20px;
+        }
+        .toc h3 { margin-top: 0; color: #0c4a6e; }
+        .toc a {
+            color: #0284c7;
+            text-decoration: none;
+            display: inline-block;
+            margin: 8px 15px 8px 0;
+            padding: 8px 12px;
+            background: white;
+            border-radius: 6px;
+            transition: all 0.2s;
+            border: 1px solid #e0e7ff;
+        }
+        .toc a:hover { background: #0284c7; color: white; }
+
+        /* Data Processing Steps */
+        .processing-step {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-left: 5px solid #3b82f6;
+            padding: 25px;
+            margin: 20px 0;
+            border-radius: 8px;
+            position: relative;
+        }
+        .processing-step.complete { border-left-color: #10b981; background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%); }
+        .processing-step.active { border-left-color: #f59e0b; background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); }
+
+        .step-number {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            background: #3b82f6;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 40px;
+            font-weight: 700;
+            font-size: 1.2em;
+            margin-right: 12px;
+            position: relative;
+            z-index: 2;
+        }
+        .processing-step.complete .step-number { background: #10b981; }
+        .processing-step.active .step-number { background: #f59e0b; }
+
+        .step-title {
+            font-weight: 700;
+            font-size: 1.15em;
+            color: #0f172a;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .step-content {
+            margin-left: 52px;
+            color: #475569;
+            line-height: 1.8;
+        }
+        .step-content strong { color: #1e293b; }
+        .step-content ul {
+            margin: 10px 0 10px 20px;
+            list-style: none;
+        }
+        .step-content li {
+            margin: 6px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+        .step-content li:before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: #3b82f6;
+            font-weight: bold;
+        }
+
+        /* Flow Diagram */
+        .flow-box {
+            background: #f0f4ff;
+            border: 3px solid #3b82f6;
+            border-radius: 10px;
+            padding: 25px;
+            margin: 25px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            line-height: 1.8;
+            overflow-x: auto;
+            color: #1e293b;
+        }
+
+        .arrow-flow {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 20px 0;
+            gap: 15px;
+        }
+        .flow-item {
+            background: white;
+            border: 2px solid #3b82f6;
+            border-radius: 8px;
+            padding: 15px;
+            flex: 1;
+            text-align: center;
+            font-weight: 600;
+            color: #0f172a;
+            min-width: 120px;
+        }
+        .flow-item.model {
+            background: #dbeafe;
+            border-color: #0284c7;
+            color: #0c4a6e;
+        }
+        .flow-arrow {
+            font-size: 1.5em;
+            color: #3b82f6;
+            flex: 0;
+        }
+
+        /* Model Card */
+        .model-card {
+            background: linear-gradient(135deg, #f0f9ff 0%, #ecf0ff 100%);
+            border: 2px solid #0284c7;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 6px solid #0284c7;
+        }
+        .model-name {
+            font-weight: 700;
+            font-size: 1.1em;
+            color: #0c4a6e;
+            margin-bottom: 8px;
+        }
+        .model-detail {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 12px;
+        }
+        .model-detail-item {
+            background: white;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 3px solid #0284c7;
+        }
+        .model-detail-item strong {
+            color: #0c4a6e;
+            display: block;
+            font-size: 0.85em;
+            margin-bottom: 4px;
+        }
+        .model-detail-item span {
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        table th {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 700;
+        }
+        table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        table tr:hover { background: #f8fafc; }
+        table tr:last-child td { border-bottom: 2px solid #3b82f6; }
+
+        /* Info boxes */
+        .info-box {
+            background: #ecfdf5;
+            border-left: 5px solid #10b981;
+            padding: 18px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .info-box strong { color: #059669; }
+
+        .warning-box {
+            background: #fef2f2;
+            border-left: 5px solid #ef4444;
+            padding: 18px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .highlight-box {
+            background: #fef3c7;
+            border-left: 5px solid #f59e0b;
+            padding: 18px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        /* Grid */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .card {
+            background: #f8fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 18px;
+            border-left: 5px solid #3b82f6;
+        }
+        .card h4 { margin-bottom: 10px; color: #1e293b; }
+        .card p { font-size: 0.95em; color: #475569; margin: 8px 0; }
+        .card .stat { font-size: 1.6em; font-weight: 800; color: #3b82f6; }
+
+        .footer {
+            text-align: center;
+            color: #94a3b8;
+            font-size: 0.9em;
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 2px solid #e2e8f0;
+        }
+
+        code {
+            background: #f1f5f9;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #1e293b;
+        }
+
+        @media print {
+            body { background: white; }
+            .section { box-shadow: none; border: 1px solid #e2e8f0; }
+            .toc { position: static; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <h1>🎯 GraphRAG Career Advisor - Complete Architecture</h1>
+        <p class="subtitle">Step-by-Step Breakdown: Data → Models → Pipeline</p>
+
+        <!-- Navigation -->
+        <div class="toc">
+            <h3>📍 Quick Navigation</h3>
+            <a href="#data-processing">Data Processing</a>
+            <a href="#models">All Models Used</a>
+            <a href="#kg-creation">KG Creation & Embeddings</a>
+            <a href="#runtime-pipeline">Runtime Pipeline</a>
+        </div>
+
+        <!-- ============================================
+             SECTION 1: DATA PROCESSING STEPS
+             ============================================ -->
+        <div class="section orange" id="data-processing">
+            <h2><span class="emoji">📊</span> Part 1: Data Processing Steps (One-Time Setup)</h2>
+
+            <div class="info-box">
+                <strong>ℹ️ Important:</strong> These steps happen ONCE during setup. The resulting graph and embeddings are stored on disk and reused for every user query. No rebuilding needed unless source data changes.
+            </div>
+
+            <!-- Step 1 -->
+            <div class="processing-step complete">
+                <div class="step-title">
+                    <span class="step-number">1</span>
+                    Load Source Data
+                </div>
+                <div class="step-content">
+                    <strong>Input Files:</strong>
+                    <ul>
+                        <li><strong>ONET_Data.xlsx</strong> (US occupational database) → 1,016 roles + 4,000 skills/elements</li>
+                        <li><strong>ESCO CSV Files</strong> (European skills framework) → 3,039 roles + 14,000 skills</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Step 2 -->
+            <div class="processing-step complete">
+                <div class="step-title">
+                    <span class="step-number">2</span>
+                    Parse ONET Data
+                </div>
+                <div class="step-content">
+                    <strong>What happens:</strong> <code>src/onet_preprocessing.py</code> reads Excel
+                    <ul>
+                        <li>Extract <strong>1,016 role nodes</strong> (e.g., "Data Scientist", "Manager")</li>
+                        <li>Extract <strong>~4,000 element nodes</strong> (knowledge, skills, abilities)</li>
+                        <li>Create <strong>~120,000 REQUIRES edges</strong> (role → element) with importance levels (0–5)</li>
+                        <li>Filter: only keep ONET importance ≥ 3.0 (exclude low-priority skills)</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Step 3 -->
+            <div class="processing-step complete">
+                <div class="step-title">
+                    <span class="step-number">3</span>
+                    Parse ESCO Data
+                </div>
+                <div class="step-content">
+                    <strong>What happens:</strong> <code>src/esco_preprocessing.py</code> reads CSV files
+                    <ul>
+                        <li>Extract <strong>3,039 role nodes</strong> (e.g., "Data Analyst", "Software Engineer")</li>
+                        <li>Extract <strong>~14,000 skill nodes</strong> (ESCO skill taxonomy)</li>
+                        <li>Create <strong>~115,000 REQUIRES edges</strong> (role → skill) marked 'essential' or 'optional'</li>
+                        <li>Build hierarchies: BROADER_THAN, NARROWER_THAN, ISCO group membership</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Step 4 -->
+            <div class="processing-step complete">
+                <div class="step-title">
+                    <span class="step-number">4</span>
+                    Merge into Single Graph
+                </div>
+                <div class="step-content">
+                    <strong>What happens:</strong> <code>src/graph_build.py</code>
+                    <ul>
+                        <li>Combine ONET + ESCO nodes & edges into one <strong>NetworkX DiGraph</strong></li>
+                        <li>No collisions: prefix nodes with "ONET_" or "ESCO_" to distinguish sources</li>
+                        <li><strong>Result:</strong> 22,259 total nodes | 235,501 total edges (mostly REQUIRES)</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Step 5 -->
+            <div class="processing-step complete">
+                <div class="step-title">
+                    <span class="step-number">5</span>
+                    Create Cross-Dataset Alignment
+                </div>
+                <div class="step-content">
+                    <strong>What happens:</strong> <code>graph_build.py</code> with embeddings
+                    <ul>
+                        <li>For each of the 1,016 ONET roles: embed it (call API)</li>
+                        <li>For each of the 3,039 ESCO roles: embed it (call API)</li>
+                        <li><strong>~41 API batches total</strong> to embed all 4,055 roles</li>
+                        <li>Compare embeddings: calculate cosine similarity between every ONET ↔ ESCO pair</li>
+                        <li>If similarity ≥ 0.45: create <strong>SIMILAR_TO edge</strong> (bidirectional)</li>
+                        <li><strong>Result:</strong> 25,262 SIMILAR_TO edges bridging the two datasets</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Step 6 -->
+            <div class="processing-step complete">
+                <div class="step-title">
+                    <span class="step-number">6</span>
+                    Save Graph to Disk
+                </div>
+                <div class="step-content">
+                    <strong>What happens:</strong> Serialize the complete graph
+                    <ul>
+                        <li>Write to: <code>graph/graph.gpickle</code> (~500 MB, binary format)</li>
+                        <li>Load time: 2–3 seconds at server startup</li>
+                        <li><strong>Benefit:</strong> Graph now in memory for millisecond-fast queries</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Step 7 -->
+            <div class="processing-step active">
+                <div class="step-title">
+                    <span class="step-number">7</span>
+                    Pre-Compute & Index Embeddings
+                </div>
+                <div class="step-content">
+                    <strong>What happens:</strong> <code>src/embeddings_index.py`</code>
+                    <ul>
+                        <li>Take the 4,055 role nodes (from Step 5)</li>
+                        <li>For each role: <strong>extract text</strong> (title + description + essential skills)</li>
+                        <li>Call Azure embedder for each role → get 3072-dimensional vector</li>
+                        <li>Store all 4,055 embeddings in <strong>ChromaDB</strong> (vector database)</li>
+                        <li>Save to disk: <code>index/chroma/</code></li>
+                        <li><strong>Benefit:</strong> At runtime, user query → embed in 1 API call → search 4,055 roles in milliseconds</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Summary Table -->
+            <h3>Data Processing Summary</h3>
+            <table>
+                <tr>
+                    <th>Stage</th>
+                    <th>Input</th>
+                    <th>Process</th>
+                    <th>Output</th>
+                </tr>
+                <tr>
+                    <td><strong>1–3</strong></td>
+                    <td>ONET Excel + ESCO CSV</td>
+                    <td>Parse separately</td>
+                    <td>4,055 roles + 18k skills</td>
+                </tr>
+                <tr>
+                    <td><strong>4</strong></td>
+                    <td>Separate datasets</td>
+                    <td>Merge nodes & edges</td>
+                    <td>Single NetworkX graph</td>
+                </tr>
+                <tr>
+                    <td><strong>5</strong></td>
+                    <td>4,055 role texts</td>
+                    <td>Embed + compare (cosine)</td>
+                    <td>25,262 SIMILAR_TO edges</td>
+                </tr>
+                <tr>
+                    <td><strong>6</strong></td>
+                    <td>Complete graph</td>
+                    <td>Pickle serialize</td>
+                    <td>graph.gpickle (~500MB)</td>
+                </tr>
+                <tr>
+                    <td><strong>7</strong></td>
+                    <td>4,055 roles + embeddings</td>
+                    <td>Index in ChromaDB</td>
+                    <td>index/chroma/ (fast search)</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- ============================================
+             SECTION 2: ALL MODELS USED
+             ============================================ -->
+        <div class="section green" id="models">
+            <h2><span class="emoji">🧠</span> Part 2: All AI Models & What They Do</h2>
+
+            <div class="highlight-box">
+                <strong>⚡ Key Point:</strong> All models run on Azure Cognitive Services. Each has a specific job in the pipeline.
+            </div>
+
+            <!-- Model 1 -->
+            <div class="model-card">
+                <div class="model-name">🤖 Model 1: text-embedding-3-large</div>
+                <div class="model-detail">
+                    <div class="model-detail-item">
+                        <strong>Type</strong>
+                        <span>Embedding Model</span>
+                    </div>
+                    <div class="model-detail-item">
+                        <strong>Vector Size</strong>
+                        <span>3,072 dimensions</span>
+                    </div>
+                    <div class="model-detail-item">
+                        <strong>Purpose</strong>
+                        <span>Convert text → numbers for comparison</span>
+                    </div>
+                    <div class="model-detail-item">
+                        <strong>When Called</strong>
+                        <span>During build (41 times) + Runtime (1 per query)</span>
+                    </div>
+                </div>
+                <p style="margin-top: 15px; color: #475569;">
+                    <strong>What it does:</strong> Takes text (role title + description) and converts it into a 3072-dimensional vector. Similar roles get similar vectors (cosine distance). Used to:
+                    <ul style="margin: 10px 0 0 20px;">
+                        <li><strong>During setup:</strong> Embed all 4,055 roles to find cross-dataset matches (SIMILAR_TO edges)</li>
+                        <li><strong>At runtime:</strong> Embed user's query to find relevant roles in ChromaDB</li>
+                    </ul>
+                </p>
+            </div>
+
+            <!-- Model 2 -->
+            <div class="model-card">
+                <div class="model-name">🏆 Model 2: Cohere Rerank v4.0-pro</div>
+                <div class="model-detail">
+                    <div class="model-detail-item">
+                        <strong>Type</strong>
+                        <span>Ranking/Reranking Model</span>
+                    </div>
+                    <div class="model-detail-item">
+                        <strong>Input</strong>
+                        <span>Query + 50 candidates</span>
+                    </div>
+                    <div class="model-detail-item">
+                        <strong>Output</strong>
+                        <span>Top-5 scored candidates</span>
+                    </div>
+                    <div class="model-detail-item">
+                        <strong>When Called</strong>
+                        <span>Every user query (Step 3 of pipeline)</span>
+                    </div>
+                </div>
+                <p style="margin-top: 15px; color: #475569;">
+                    <strong>What it does:</strong> Takes query + 50 candidate roles, re-scores them for relevance, returns top-5. Why needed? Embedding search is fast but sometimes imprecise. Cohere reads the query & candidate text more deeply and fixes ranking mistakes.
+                </p>
+            </div>
+
+            <!-- Model 3 -->
+            <div class="model-card">
+                <div class="model-name">💬 Model 3: gpt-5.4-nano (Reasoning Model)</div>
+                <div class="model-detail">
+                    <div class="model-detail-item">
+                        <strong>Type</strong>
+                        <span>LLM (Reasoning)</span>
+                    </div>
+                    <div class="model-detail-item">
+                        <strong>Used For</strong>
+                        <span>Routing + Generation</span>
+                    </div>
+                    <div class="model-detail-item">
+                        <strong>Token Budgets</strong>
+                        <span>Routing: 2k | Gen: 4k</span>
+                    </div>
+                    <div class="model-detail-item">
+                        <strong>Special Feature</strong>
+                        <span>Internal chain-of-thought</span>
+                    </div>
+                </div>
+                <p style="margin-top: 15px; color: #475569;">
+                    <strong>What it does:</strong> This is the "thinking" model. It has two jobs:
+                    <ul style="margin: 10px 0 0 20px;">
+                        <li><strong>Job 1 (Step 1 - Routing):</strong> Analyzes conversation history. Detects: Is user a student or professional? Do they have enough info (degree/role, skills, goal)? Returns: JSON with user type + context flag</li>
+                        <li><strong>Job 2 (Step 5 - Generation):</strong> Reads full history + graph data + user query. Generates conversational career advice (3–4 paragraphs, no bullets). Only mentions roles/skills from the graph.</li>
+                    </ul>
+                    <strong>Why "reasoning"?</strong> It uses internal chain-of-thought before outputting. This improves quality but uses extra tokens, so budgets are set high (2k/4k).
+                </p>
+            </div>
+
+            <h3>Model Usage Summary</h3>
+            <table>
+                <tr>
+                    <th>Model</th>
+                    <th>Job</th>
+                    <th>Called When</th>
+                    <th>Why This Model?</th>
+                </tr>
+                <tr>
+                    <td><strong>text-embedding-3-large</strong></td>
+                    <td>Text → 3072D vector</td>
+                    <td>Setup (41×) + Runtime (1×)</td>
+                    <td>Fast semantic search; finds similar roles</td>
+                </tr>
+                <tr>
+                    <td><strong>Cohere Rerank</strong></td>
+                    <td>Score 50 → top 5</td>
+                    <td>Every query (Step 3)</td>
+                    <td>Deep relevance scoring; fixes embedding mistakes</td>
+                </tr>
+                <tr>
+                    <td><strong>gpt-5.4-nano</strong></td>
+                    <td>Routing + Generation</td>
+                    <td>Every query (Steps 1 & 5)</td>
+                    <td>Reasoning + conversation; understands intent & context</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- ============================================
+             SECTION 3: KNOWLEDGE GRAPH CREATION
+             ============================================ -->
+        <div class="section purple" id="kg-creation">
+            <h2><span class="emoji">🕸️</span> Part 3: Knowledge Graph Creation & Embeddings</h2>
+
+            <div class="info-box">
+                <strong>ℹ️ What is a Knowledge Graph?</strong> A collection of nodes (roles, skills) and edges (relationships like "requires", "similar to"). Used to store facts so queries can traverse relationships.
+            </div>
+
+            <h3>The Knowledge Graph in Numbers</h3>
+            <div class="grid">
+                <div class="card">
+                    <h4>📍 Total Nodes</h4>
+                    <p><span class="stat">22,259</span></p>
+                    <p style="font-size: 0.9em;">4,055 roles + 18,204 skills/elements</p>
+                </div>
+                <div class="card">
+                    <h4>🔗 Total Edges</h4>
+                    <p><span class="stat">235,501</span></p>
+                    <p style="font-size: 0.9em;">Mostly REQUIRES + SIMILAR_TO</p>
+                </div>
+                <div class="card">
+                    <h4>📦 Storage</h4>
+                    <p><span class="stat">~500 MB</span></p>
+                    <p style="font-size: 0.9em;">Pickled NetworkX DiGraph</p>
+                </div>
+                <div class="card">
+                    <h4>⚡ Load Time</h4>
+                    <p><span class="stat">2–3 sec</span></p>
+                    <p style="font-size: 0.9em;">At server startup</p>
+                </div>
+            </div>
+
+            <h3>Step-by-Step: How KG Uses Embeddings</h3>
+
+            <div class="processing-step complete">
+                <div class="step-title">
+                    <span class="step-number">A</span>
+                    Extract Text from Roles
+                </div>
+                <div class="step-content">
+                    For each of 4,055 roles (ONET + ESCO):
+                    <ul>
+                        <li>Combine: <strong>role title + description + essential skills (as text)</strong></li>
+                        <li>Example: "Data Scientist — analyze data using statistics, machine learning, Python, SQL"</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="processing-step complete">
+                <div class="step-title">
+                    <span class="step-number">B</span>
+                    Call Embedding API for Each Role
+                </div>
+                <div class="step-content">
+                    For each role text:
+                    <ul>
+                        <li>Send to Azure <code>text-embedding-3-large</code></li>
+                        <li>Receive back: <strong>3,072-dimensional vector</strong> (array of 3,072 numbers)</li>
+                        <li><strong>Batch API calls:</strong> Send multiple roles per call (41 total batches)</li>
+                        <li>Each vector captures the semantic meaning of that role</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="processing-step complete">
+                <div class="step-title">
+                    <span class="step-number">C</span>
+                    Compare Vectors: Find Similar Roles
+                </div>
+                <div class="step-content">
+                    Now we have 4,055 vectors (one per role):
+                    <ul>
+                        <li>Compare every ONET role vector to every ESCO role vector</li>
+                        <li>Use <strong>cosine similarity</strong> (measures angle between vectors: 0 to 1)</li>
+                        <li>If similarity ≥ 0.45: create <strong>SIMILAR_TO edge</strong></li>
+                        <li><strong>Example:</strong> ONET "Data Analyst" (0.78 similar) ↔ ESCO "Data Analyst"</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="processing-step complete">
+                <div class="step-title">
+                    <span class="step-number">D</span>
+                    Result: 25,262 SIMILAR_TO Edges
+                </div>
+                <div class="step-content">
+                    <ul>
+                        <li>Each SIMILAR_TO edge stores the cosine similarity score</li>
+                        <li>Users navigating ONET careers can now find equivalent ESCO careers</li>
+                        <li>Creates a bridge between US & European job markets</li>
+                    </ul>
+                </div>
+            </div>
+
+            <h3>Where Are Embeddings Stored?</h3>
+            <div class="flow-box">graph_build.py (creates embeddings)
+    ↓
+embeddings_index.py (stores in vector database)
+    ↓
+ChromaDB (persistent vector store)
+    ↓ Directory: index/chroma/
+    ├─ vectors.db          (4,055 embedding vectors)
+    ├─ metadata/           (role IDs, titles, sources)
+    └─ Ready for fast cosine search at runtime
+            </div>
+
+            <h3>Embedding Benefits</h3>
+            <div class="info-box">
+                <strong>✓ Pre-computed:</strong> All 4,055 role embeddings calculated once, stored in ChromaDB. No rebuild unless roles change.<br>
+                <strong>✓ Fast retrieval:</strong> User query → embed (1 API call) → search 4,055 roles → top 50 in ~100ms<br>
+                <strong>✓ Semantic matching:</strong> Finds related roles even if keywords don't match (e.g., "data work" matches "Data Analyst")
+            </div>
+        </div>
+
+        <!-- ============================================
+             SECTION 4: RUNTIME QUERY PIPELINE
+             ============================================ -->
+        <div class="section pink" id="runtime-pipeline">
+            <h2><span class="emoji">⚡</span> Part 4: What Happens When User Sends a Prompt?</h2>
+
+            <div class="highlight-box">
+                <strong>🔄 The 6-Step Pipeline:</strong> User query flows through 6 steps, each calling specific models/services. Happens every time a user sends a message.
+            </div>
+
+            <!-- Step 1 -->
+            <div class="processing-step">
+                <div class="step-title">
+                    <span class="step-number">1</span>
+                    ROUTE INTENT (Analyze Context)
+                </div>
+                <div class="step-content">
+                    <strong>Input:</strong> Full conversation history (all messages so far)<br>
+                    <strong>Model Called:</strong> <code>gpt-5.4-nano</code> (reasoning LLM)<br>
+                    <strong>What it does:</strong>
+                    <ul>
+                        <li>Reads conversation history</li>
+                        <li>Detects user type: <strong>student vs professional?</strong></li>
+                        <li>Checks if enough context: Does user mention degree/role? Skills? Goal?</li>
+                        <li>If context incomplete: return follow-up questions; don't proceed</li>
+                        <li>If context complete: return {"has_context": true, "user_type": "student"}</li>
+                    </ul>
+                    <strong>Why this step?</strong> Routing early saves API calls if we need more info from user<br>
+                    <strong>Token budget:</strong> 2,000 max output tokens
+                </div>
+            </div>
+
+            <div class="arrow-flow">
+                <div class="flow-item">✓ Context Check</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-item">✓ User Type Detected</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-item model">Step 2</div>
+            </div>
+
+            <!-- Step 2 -->
+            <div class="processing-step">
+                <div class="step-title">
+                    <span class="step-number">2</span>
+                    RETRIEVE CANDIDATES (Fast Semantic Search)
+                </div>
+                <div class="step-content">
+                    <strong>Input:</strong> User's last message<br>
+                    <strong>Model Called:</strong> <code>text-embedding-3-large</code><br>
+                    <strong>What it does:</strong>
+                    <ul>
+                        <li>Extract user's last query (e.g., "I want to work with data and AI")</li>
+                        <li>Call Azure embedder: convert query → 3,072-dim vector</li>
+                        <li>Query ChromaDB: find roles with similar vectors (cosine distance)</li>
+                        <li>Return <strong>top 50 roles</strong> sorted by similarity</li>
+                    </ul>
+                    <strong>Why this step?</strong> Embedding search is fast (~100ms) and captures semantic meaning<br>
+                    <strong>API calls:</strong> 1 embedding API call
+                </div>
+            </div>
+
+            <div class="arrow-flow">
+                <div class="flow-item">Query Embedded</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-item">ChromaDB Search</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-item model">50 Candidates</div>
+            </div>
+
+            <!-- Step 3 -->
+            <div class="processing-step">
+                <div class="step-title">
+                    <span class="step-number">3</span>
+                    RERANK CANDIDATES (Deep Relevance Scoring)
+                </div>
+                <div class="step-content">
+                    <strong>Input:</strong> User query + 50 candidate roles<br>
+                    <strong>Model Called:</strong> <code>Cohere Rerank v4.0-pro</code><br>
+                    <strong>What it does:</strong>
+                    <ul>
+                        <li>Send query + 50 role descriptions to Cohere API</li>
+                        <li>Cohere reads both query and roles deeply, scores each for relevance</li>
+                        <li>Return <strong>top 5 roles with scores</strong> (e.g., 0.92, 0.88, 0.85, 0.79, 0.75)</li>
+                    </ul>
+                    <strong>Why this step?</strong> Embedding search sometimes ranks suboptimally. Cohere's deep reading fixes this<br>
+                    <strong>API calls:</strong> 1 rerank API call
+                </div>
+            </div>
+
+            <div class="arrow-flow">
+                <div class="flow-item">50 Candidates In</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-item">Deep Scoring</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-item model">5 Anchor Roles</div>
+            </div>
+
+            <!-- Step 4 -->
+            <div class="processing-step">
+                <div class="step-title">
+                    <span class="step-number">4</span>
+                    TRAVERSE GRAPH (Gather Career Data)
+                </div>
+                <div class="step-content">
+                    <strong>Input:</strong> 5 anchor roles + user_type (student vs professional)<br>
+                    <strong>No API call:</strong> Direct in-memory graph traversal (NetworkX DiGraph)<br>
+                    <strong>What it does:</strong>
+                    <ul>
+                        <li><strong>For each of 5 anchor roles:</strong></li>
+                        <li>Get REQUIRES edges: what skills does this role need?
+                            <ul style="margin-left: 20px;">
+                                <li>If student: show skills with level ≥ 3.0</li>
+                                <li>If professional: show only 'essential' skills</li>
+                            </ul>
+                        </li>
+                        <li>Get SIMILAR_TO edges: which roles in the other dataset are similar?</li>
+                        <li>Get BROADER_THAN / NARROWER_THAN: role hierarchy</li>
+                        <li>Compile everything into structured triples: [role, relation_type, target]</li>
+                    </ul>
+                    <strong>Output format:</strong>
+                    <pre>{
+  "roles": [
+    {
+      "node_id": "ONET_11-1011",
+      "title": "CEO",
+      "requires": [
+        {"skill": "Strategic Planning", "level": 4.2},
+        {"skill": "Leadership", "level": 4.5}
+      ],
+      "related_roles": [
+        {"node_id": "ESCO_123", "relation": "SIMILAR_TO"}
+      ]
+    },
+    ...
+  ]
+}</pre>
+                </div>
+            </div>
+
+            <div class="arrow-flow">
+                <div class="flow-item model">5 Roles</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-item">Graph Walk</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-item">Structured Data</div>
+            </div>
+
+            <!-- Step 5 -->
+            <div class="processing-step">
+                <div class="step-title">
+                    <span class="step-number">5</span>
+                    GENERATE RESPONSE (Conversational Advice)
+                </div>
+                <div class="step-content">
+                    <strong>Input:</strong> Full conversation history + graph triples + system prompt<br>
+                    <strong>Model Called:</strong> <code>gpt-5.4-nano</code> (same reasoning LLM)<br>
+                    <strong>What it does:</strong>
+                    <ul>
+                        <li>Assemble prompt:
+                            <ul style="margin-left: 20px;">
+                                <li>System message: role-specific (student advisor vs career coach)</li>
+                                <li>Full message history: so model remembers prior context</li>
+                                <li>Graph data: structured triples of roles + skills</li>
+                                <li>User's latest query</li>
+                            </ul>
+                        </li>
+                        <li>Send to gpt-5.4-nano</li>
+                        <li>Receive: 3–4 paragraph career advice</li>
+                        <li><strong>Constraint:</strong> Model only mentions roles/skills from the graph (enforced in system prompt)</li>
+                    </ul>
+                    <strong>Output example:</strong><br>
+                    <em>"Based on your CS background and goals, I'd recommend considering data science roles like Data Analyst or Machine Learning Engineer. These roles value your Python and SQL skills and provide a great foundation for more specialized positions..."</em>
+                    <br>
+                    <strong>Token budget:</strong> 4,000 max output tokens
+                </div>
+            </div>
+
+            <div class="arrow-flow">
+                <div class="flow-item model">Prompt Assembled</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-item">LLM Generates</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-item">Career Advice</div>
+            </div>
+
+            <!-- Step 6 -->
+            <div class="processing-step">
+                <div class="step-title">
+                    <span class="step-number">6</span>
+                    FETCH COURSERA COURSES (Learning Paths)
+                </div>
+                <div class="step-content">
+                    <strong>Input:</strong> 5 anchor roles + essential skills<br>
+                    <strong>Method:</strong> HTML scraping (no API key needed)<br>
+                    <strong>What it does:</strong>
+                    <ul>
+                        <li><strong>For each anchor role:</strong>
+                            <ul style="margin-left: 20px;">
+                                <li>Search Coursera: "{role_title} course"</li>
+                                <li>Extract top courses: title, provider, workload, certificate</li>
+                            </ul>
+                        </li>
+                        <li><strong>For each essential skill:</strong>
+                            <ul style="margin-left: 20px;">
+                                <li>Search Coursera: "{skill_name} course"</li>
+                                <li>Combine with role courses</li>
+                            </ul>
+                        </li>
+                        <li>Pick <strong>top 2–3 courses</strong></li>
+                        <li>Return: [{"title": "...", "provider": "...", "workload": "...", ...}, ...]</li>
+                    </ul>
+                    <strong>Output:</strong> Structured course list for frontend
+                </div>
+            </div>
+
+            <h3>Complete Pipeline Overview</h3>
+            <div class="flow-box">USER SENDS PROMPT
+    ↓
+┌──────────────────────────────────────────────────────────────┐
+│ Step 1: ROUTE INTENT                                         │
+│ Model: gpt-5.4-nano                                          │
+│ Detect: student/professional? Context enough?                │
+│ Output: {"has_context": bool, "user_type": str}              │
+└────────────────────┬─────────────────────────────────────────┘
+                     ↓ (if has_context = true)
+┌──────────────────────────────────────────────────────────────┐
+│ Step 2: RETRIEVE CANDIDATES                                  │
+│ Model: text-embedding-3-large                               │
+│ Embed query → search ChromaDB → top 50 roles                 │
+│ Output: candidate_list (50 roles)                            │
+└────────────────────┬─────────────────────────────────────────┘
+                     ↓
+┌──────────────────────────────────────────────────────────────┐
+│ Step 3: RERANK CANDIDATES                                    │
+│ Model: Cohere Rerank v4.0-pro                                │
+│ Deep scoring: 50 → top 5                                     │
+│ Output: anchor_roles (5 highest-ranked)                      │
+└────────────────────┬─────────────────────────────────────────┘
+                     ↓
+┌──────────────────────────────────────────────────────────────┐
+│ Step 4: TRAVERSE GRAPH                                       │
+│ No model: in-memory NetworkX traversal                       │
+│ For each anchor: extract skills, related roles, hierarchy    │
+│ Output: knowledge_triples (structured)                       │
+└────────────────────┬─────────────────────────────────────────┘
+                     ↓
+┌──────────────────────────────────────────────────────────────┐
+│ Step 5: GENERATE RESPONSE                                    │
+│ Model: gpt-5.4-nano                                          │
+│ Inputs: history + graph + query → Output: advice message     │
+│ Constraint: only cite graph roles/skills                     │
+└────────────────────┬─────────────────────────────────────────┘
+                     ↓
+┌──────────────────────────────────────────────────────────────┐
+│ Step 6: FETCH COURSERA COURSES                               │
+│ Method: HTML scraping                                        │
+│ Input: anchor roles + essential skills → Output: courses     │
+└────────────────────┬─────────────────────────────────────────┘
+                     ↓
+            SEND TO FRONTEND
+            {
+              "status": "ok",
+              "message": "Career advice text",
+              "courses": [...]
+            }
+            </div>
+
+            <h3>Which Model is Called When?</h3>
+            <table>
+                <tr>
+                    <th>Pipeline Step</th>
+                    <th>Model / Method</th>
+                    <th>Input</th>
+                    <th>Output</th>
+                    <th>API Calls</th>
+                </tr>
+                <tr>
+                    <td><strong>1. ROUTE</strong></td>
+                    <td>gpt-5.4-nano</td>
+                    <td>Full history</td>
+                    <td>{"has_context", "user_type"}</td>
+                    <td>1</td>
+                </tr>
+                <tr>
+                    <td><strong>2. RETRIEVE</strong></td>
+                    <td>text-embedding-3-large</td>
+                    <td>Last query</td>
+                    <td>Top 50 roles</td>
+                    <td>1</td>
+                </tr>
+                <tr>
+                    <td><strong>3. RERANK</strong></td>
+                    <td>Cohere Rerank</td>
+                    <td>Query + 50 roles</td>
+                    <td>Top 5 roles (scored)</td>
+                    <td>1</td>
+                </tr>
+                <tr>
+                    <td><strong>4. TRAVERSE</strong></td>
+                    <td>NetworkX (in-memory)</td>
+                    <td>5 anchor roles</td>
+                    <td>Knowledge triples</td>
+                    <td>0 (local)</td>
+                </tr>
+                <tr>
+                    <td><strong>5. GENERATE</strong></td>
+                    <td>gpt-5.4-nano</td>
+                    <td>History + graph + query</td>
+                    <td>Career advice text</td>
+                    <td>1</td>
+                </tr>
+                <tr>
+                    <td><strong>6. COURSERA</strong></td>
+                    <td>HTML scraping</td>
+                    <td>5 roles + skills</td>
+                    <td>Course list</td>
+                    <td>0 (HTTP)</td>
+                </tr>
+            </table>
+
+            <h3>Model Call Sequence (Visual)</h3>
+            <div class="flow-box">Time →
+
+Step 1: gpt-5.4-nano routes intent
+|
++→ [⏱️ ~500ms]
+
+Step 2: text-embedding-3-large embeds query
+|
++→ [⏱️ ~200ms]
+
+Step 3: Cohere Rerank scores candidates
+|
++→ [⏱️ ~300ms]
+
+Step 4: NetworkX graph traversal (local, fast)
+|
++→ [⏱️ ~50ms]
+
+Step 5: gpt-5.4-nano generates response
+|
++→ [⏱️ ~1500ms - reasoning takes time]
+
+Step 6: HTML scraping for Coursera courses
+|
++→ [⏱️ ~800ms]
+
+TOTAL: ~3–4 seconds per user query
+            </div>
+
+            <div class="info-box">
+                <strong>Key Insight:</strong>
+                <ul style="margin-top: 10px; margin-left: 20px;">
+                    <li>3 model API calls per query: 2× gpt-5.4-nano + 1× embedding + 1× rerank</li>
+                    <li>1 in-memory graph traversal (milliseconds, no API call)</li>
+                    <li>1 HTTP scrape (Coursera, variable time)</li>
+                    <li>Total round-trip: ~3–4 seconds</li>
+                    <li>All previous queries' data (graph + embeddings) cached on disk/RAM</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- ============================================
+             SECTION 5: EXAMPLE PROMPTS
+             ============================================ -->
+        <div class="section orange">
+            <h2><span class="emoji">💬</span> Part 5: Example Prompts - Complete vs Incomplete</h2>
+
+            <div class="info-box">
+                <strong>ℹ️ How Step 1 (ROUTE INTENT) Works:</strong> The LLM reads the conversation and checks:
+                <ul style="margin-top: 10px; margin-left: 20px;">
+                    <li><strong>For STUDENT:</strong> Has degree/field? Has skills? Has career goal? → All 3 needed</li>
+                    <li><strong>For PROFESSIONAL:</strong> Has current role? Has experience/skills? Has next step goal? → All 3 needed</li>
+                </ul>
+            </div>
+
+            <!-- EXAMPLE 1: COMPLETE PROMPT -->
+            <h3>✅ Example 1: COMPLETE PROMPT (Enough Context)</h3>
+
+            <div style="background: #f0fdf4; border: 2px solid #10b981; border-radius: 10px; padding: 25px; margin: 20px 0;">
+                <div style="font-weight: 700; color: #059669; margin-bottom: 15px;">User Message:</div>
+                <div style="background: white; border-left: 5px solid #10b981; padding: 18px; border-radius: 8px; margin-bottom: 20px; font-family: 'Courier New', monospace; color: #1e293b; line-height: 1.7;">
+                    "I just graduated with a BSc in Computer Science. I know Python, SQL, and I have some experience with machine learning from my university projects. I'm interested in transitioning into a data science or AI role where I can work on real-world problems. What careers should I consider and how do I prepare?"
+                </div>
+
+                <div style="font-weight: 700; color: #059669; margin-bottom: 15px;">Step 1: ROUTE INTENT Analysis</div>
+                <div style="background: #dbeafe; border: 2px solid #0284c7; border-radius: 8px; padding: 15px; font-family: 'Courier New', monospace; color: #0c4a6e; font-size: 0.9em; margin-bottom: 20px;">
+                    {
+  &quot;has_context&quot;: <span style="color: #10b981; font-weight: 700;">true</span>,
+  &quot;user_type&quot;: <span style="color: #10b981; font-weight: 700;">&quot;student&quot;</span>,
+  &quot;detected_degree&quot;: &quot;BSc Computer Science&quot;,
+  &quot;detected_skills&quot;: [&quot;Python&quot;, &quot;SQL&quot;, &quot;Machine Learning&quot;],
+  &quot;detected_goal&quot;: &quot;Data Science or AI role&quot;,
+  &quot;followup_questions&quot;: null
+                    }
+                </div>
+
+                <div style="font-weight: 700; color: #059669; margin-bottom: 10px;">✅ Context Check Result:</div>
+                <ul style="margin-left: 20px; color: #475569;">
+                    <li><strong>Degree:</strong> ✓ BSc Computer Science (mentioned)</li>
+                    <li><strong>Skills:</strong> ✓ Python, SQL, ML (mentioned)</li>
+                    <li><strong>Goal:</strong> ✓ Data Science / AI (mentioned)</li>
+                </ul>
+                <div style="background: #ecfdf5; border-left: 5px solid #10b981; padding: 12px; border-radius: 6px; margin-top: 15px; color: #059669;">
+                    <strong>✓ PROCEED:</strong> All 3 required fields present. Continue to Steps 2–6 (retrieve, rerank, graph walk, generate response, fetch courses)
+                </div>
+            </div>
+
+            <!-- EXAMPLE 2: INCOMPLETE PROMPT -->
+            <h3>❌ Example 2: INCOMPLETE/VAGUE PROMPT (Missing Context)</h3>
+
+            <div style="background: #fef2f2; border: 2px solid #ef4444; border-radius: 10px; padding: 25px; margin: 20px 0;">
+                <div style="font-weight: 700; color: #dc2626; margin-bottom: 15px;">User Message:</div>
+                <div style="background: white; border-left: 5px solid #ef4444; padding: 18px; border-radius: 8px; margin-bottom: 20px; font-family: 'Courier New', monospace; color: #1e293b; line-height: 1.7;">
+                    "What careers can I get?"
+                </div>
+
+                <div style="font-weight: 700; color: #dc2626; margin-bottom: 15px;">Step 1: ROUTE INTENT Analysis</div>
+                <div style="background: #fee2e2; border: 2px solid #ef4444; border-radius: 8px; padding: 15px; font-family: 'Courier New', monospace; color: #7f1d1d; font-size: 0.9em; margin-bottom: 20px;">
+                    {
+  &quot;has_context&quot;: <span style="color: #ef4444; font-weight: 700;">false</span>,
+  &quot;user_type&quot;: <span style="color: #ef4444; font-weight: 700;">&quot;unknown&quot;</span>,
+  &quot;detected_degree&quot;: null,
+  &quot;detected_skills&quot;: [],
+  &quot;detected_goal&quot;: null,
+  &quot;followup_questions&quot;:
+    &quot;I'd like to help! Please tell me a bit more about yourself:
+     1. What's your educational background? (e.g., degree, field of study)
+     2. What skills do you have? (e.g., programming languages, tools, soft skills)
+     3. What kind of career are you aiming for? (e.g., data science, management, engineering)&quot;
+                    }
+                </div>
+
+                <div style="font-weight: 700; color: #dc2626; margin-bottom: 10px;">❌ Context Check Result:</div>
+                <ul style="margin-left: 20px; color: #475569;">
+                    <li><strong>Degree:</strong> ✗ Not mentioned</li>
+                    <li><strong>Skills:</strong> ✗ Not mentioned</li>
+                    <li><strong>Goal:</strong> ✗ Too vague ("careers" doesn't specify direction)</li>
+                </ul>
+                <div style="background: #fef2f2; border-left: 5px solid #ef4444; padding: 12px; border-radius: 6px; margin-top: 15px; color: #dc2626;">
+                    <strong>❌ STOP:</strong> Missing 3/3 required fields. Return follow-up questions to user instead of proceeding to Steps 2–6.
+                </div>
+            </div>
+
+            <!-- COMPARISON TABLE -->
+            <h3>Side-by-Side Comparison</h3>
+            <table style="margin-top: 20px;">
+                <tr>
+                    <th>Aspect</th>
+                    <th style="background: #ecfdf5; color: #059669;">✅ Complete Prompt</th>
+                    <th style="background: #fef2f2; color: #dc2626;">❌ Incomplete Prompt</th>
+                </tr>
+                <tr>
+                    <td><strong>User Input Length</strong></td>
+                    <td>~200 characters (detailed)</td>
+                    <td>~23 characters (vague)</td>
+                </tr>
+                <tr>
+                    <td><strong>Education Info</strong></td>
+                    <td>"BSc Computer Science"</td>
+                    <td>None mentioned</td>
+                </tr>
+                <tr>
+                    <td><strong>Skills Info</strong></td>
+                    <td>Python, SQL, ML</td>
+                    <td>None mentioned</td>
+                </tr>
+                <tr>
+                    <td><strong>Career Goal</strong></td>
+                    <td>"Data Science or AI"</td>
+                    <td>"Careers" (too general)</td>
+                </tr>
+                <tr>
+                    <td><strong>Step 1 Result</strong></td>
+                    <td>has_context: <strong>true</strong></td>
+                    <td>has_context: <strong>false</strong></td>
+                </tr>
+                <tr>
+                    <td><strong>Proceeds to Steps 2–6?</strong></td>
+                    <td>✅ YES — full pipeline runs</td>
+                    <td>❌ NO — returns follow-up Qs</td>
+                </tr>
+                <tr>
+                    <td><strong>Time to Response</strong></td>
+                    <td>~3–4 seconds (full analysis)</td>
+                    <td>~500ms (just routing check)</td>
+                </tr>
+            </table>
+
+            <!-- MORE EXAMPLES -->
+            <h3 style="margin-top: 40px;">Additional Real-World Examples</h3>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
+                <!-- Example 3 -->
+                <div style="background: #ecfdf5; border: 2px solid #10b981; border-radius: 10px; padding: 20px;">
+                    <div style="font-weight: 700; color: #059669; margin-bottom: 12px;">✅ Professional - Complete</div>
+                    <div style="background: white; padding: 12px; border-radius: 6px; border-left: 4px solid #10b981; font-size: 0.9em; margin-bottom: 12px;">
+                        "I'm a financial analyst with 5 years of experience in Python, SQL, and data visualization using Tableau. I want to transition into a machine learning or data science role. What should I focus on?"
+                    </div>
+                    <div style="font-size: 0.85em; color: #059669;">
+                        <strong>✓ Check:</strong> Role (analyst), Skills (Python, SQL, Tableau), Goal (ML/data science)<br>
+                        <strong>Result:</strong> has_context: <span style="color: #10b981; font-weight: 700;">true</span>
+                    </div>
+                </div>
+
+                <!-- Example 4 -->
+                <div style="background: #fef2f2; border: 2px solid #ef4444; border-radius: 10px; padding: 20px;">
+                    <div style="font-weight: 700; color: #dc2626; margin-bottom: 12px;">❌ Professional - Incomplete</div>
+                    <div style="background: white; padding: 12px; border-radius: 6px; border-left: 4px solid #ef4444; font-size: 0.9em; margin-bottom: 12px;">
+                        "Help me find a job."
+                    </div>
+                    <div style="font-size: 0.85em; color: #dc2626;">
+                        <strong>✗ Check:</strong> Role (?), Skills (?), Goal (?)<br>
+                        <strong>Result:</strong> has_context: <span style="color: #ef4444; font-weight: 700;">false</span><br>
+                        <strong>Follow-up:</strong> Please share your current role, skills, and career goal.
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
+                <!-- Example 5 -->
+                <div style="background: #ecfdf5; border: 2px solid #10b981; border-radius: 10px; padding: 20px;">
+                    <div style="font-weight: 700; color: #059669; margin-bottom: 12px;">✅ Student - Complete</div>
+                    <div style="background: white; padding: 12px; border-radius: 6px; border-left: 4px solid #10b981; font-size: 0.9em; margin-bottom: 12px;">
+                        "I'm studying electrical engineering and I'm proficient in MATLAB, circuit design, and embedded systems. I'm interested in moving into IoT or robotics. What roles would be good for me?"
+                    </div>
+                    <div style="font-size: 0.85em; color: #059669;">
+                        <strong>✓ Check:</strong> Degree (electrical eng), Skills (MATLAB, circuits, embedded), Goal (IoT/robotics)<br>
+                        <strong>Result:</strong> has_context: <span style="color: #10b981; font-weight: 700;">true</span>
+                    </div>
+                </div>
+
+                <!-- Example 6 -->
+                <div style="background: #fef2f2; border: 2px solid #ef4444; border-radius: 10px; padding: 20px;">
+                    <div style="font-weight: 700; color: #dc2626; margin-bottom: 12px;">❌ Student - Incomplete</div>
+                    <div style="background: white; padding: 12px; border-radius: 6px; border-left: 4px solid #ef4444; font-size: 0.9em; margin-bottom: 12px;">
+                        "I'm in college. What should I do?"
+                    </div>
+                    <div style="font-size: 0.85em; color: #dc2626;">
+                        <strong>✗ Check:</strong> Degree (college, but field unclear), Skills (?), Goal (?)<br>
+                        <strong>Result:</strong> has_context: <span style="color: #ef4444; font-weight: 700;">false</span><br>
+                        <strong>Follow-up:</strong> What's your major? What skills are you developing? What career interests you?
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-box" style="margin-top: 30px;">
+                <strong>💡 Key Takeaway:</strong> The ROUTE INTENT step (Step 1) acts as a gatekeeper. It checks if the conversation has enough information to make meaningful recommendations. If not, it asks clarifying questions instead of wasting API calls and returning generic advice.
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p><strong>📚 Complete Architecture Breakdown</strong></p>
+            <p>Data Processing (7 steps) → Models (3 types) → KG Creation (embeddings + storage) → Runtime Pipeline (6 steps)</p>
+            <p style="margin-top: 15px; color: #64748b;">Designed for thesis: demonstrates RAG + LLM reasoning + cross-dataset knowledge graph integration</p>
+        </div>
+    </div>
+</body>
+</html>
