@@ -13,6 +13,8 @@ tests/
 .claude/
 .antigravitycli/
 skills-lock.json
+HANDOFF.md
+ALL_STEPS.md
 ~/
 CODE/
 static/

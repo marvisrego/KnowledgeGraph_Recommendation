@@ -3,116 +3,136 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#070A10">
     <title>Career Graph Studio</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='chat.css') }}">
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+    <script defer src="{{ url_for('static', filename='chat.js') }}"></script>
 </head>
 <body>
-    <!-- Preloader -->
-    <div class="preloader" id="preloader">
-        <div class="preloader-inner">
-            <div class="preloader-orb"></div>
-            <span class="preloader-text">Career Graph Studio</span>
-        </div>
-    </div>
+    <a class="skip-link" href="#chat-panel">Skip to career advisor</a>
 
-    <!-- Animated background -->
     <div class="bg-atmosphere" aria-hidden="true">
-        <div class="orb orb-1"></div>
-        <div class="orb orb-2"></div>
-        <div class="orb orb-3"></div>
+        <div class="atmosphere-wash"></div>
         <div class="noise-overlay"></div>
     </div>
 
     <main class="app-shell">
-        <section class="hero-panel" id="hero-panel">
-            <div class="hero-glow"></div>
-            <p class="eyebrow" data-animate="fade-up">GraphRAG Career Intelligence</p>
-            <h1 data-animate="fade-up">
-                <span class="h1-line">Career Graph</span>
-                <span class="h1-line h1-accent">Studio</span>
-            </h1>
-            <p class="hero-copy" data-animate="fade-up">
-                Get personalised career guidance grounded in ONET and ESCO occupational data.
-                Describe your background and goals to receive tailored recommendations.
-            </p>
-            <a href="/graph" target="_blank" class="graph-btn" data-animate="fade-up">
-                <span class="graph-btn-glow"></span>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="12" cy="18" r="3"/><path d="M6 9v3a6 6 0 0 0 6 6"/><path d="M18 9v3a6 6 0 0 0-6 6"/></svg>
-                Explore Knowledge Graph
-            </a>
-
-            <div class="status-grid" data-animate="fade-up">
-                <article class="status-card">
-                    <span class="status-label">Status</span>
-                    <strong id="runtime-state">
-                        <span class="status-dot"></span>
-                        Loading...
-                    </strong>
-                </article>
-                <article class="status-card">
-                    <span class="status-label">Model</span>
-                    <strong id="llm-state">Checking...</strong>
-                </article>
-                <article class="status-card">
-                    <span class="status-label">Nodes</span>
-                    <strong id="role-count" class="stat-number">-</strong>
-                </article>
-                <article class="status-card">
-                    <span class="status-label">Edges</span>
-                    <strong id="posting-count" class="stat-number">-</strong>
-                </article>
+        <section class="hero-panel" id="hero-panel" aria-labelledby="product-title">
+            <div class="hero-intro">
+                <p class="eyebrow" data-animate="fade-up">GraphRAG career intelligence</p>
+                <h1 id="product-title" data-animate="fade-up">
+                    <span class="h1-line">Career Graph</span>
+                    <span class="h1-line h1-accent">Studio</span>
+                </h1>
+                <p class="hero-copy" data-animate="fade-up">
+                    Explore career options grounded in O*NET, ESCO, and observed
+                    Karrierewege transitions. Describe where you are and where you
+                    want to go.
+                </p>
+                <a href="/graph" target="_blank" rel="noreferrer noopener" class="graph-btn" data-animate="fade-up">
+                    <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="6" cy="6" r="3"></circle>
+                        <circle cx="18" cy="6" r="3"></circle>
+                        <circle cx="12" cy="18" r="3"></circle>
+                        <path d="M6 9v3a6 6 0 0 0 6 6"></path>
+                        <path d="M18 9v3a6 6 0 0 1-6 6"></path>
+                    </svg>
+                    <span>Explore knowledge graph</span>
+                    <span class="sr-only">(opens in a new tab)</span>
+                </a>
             </div>
 
-            <div class="hero-footer" data-animate="fade-up">
+            <div class="runtime-block" data-animate="fade-up">
+                <div class="section-heading">
+                    <span>Runtime evidence</span>
+                    <span class="section-heading-rule" aria-hidden="true"></span>
+                </div>
+                <div class="status-grid">
+                    <article class="status-card">
+                        <span class="status-label">Status</span>
+                        <strong id="runtime-state" class="status-value" data-state="loading">
+                            <span class="status-dot" aria-hidden="true"></span>
+                            <span class="status-text">Loading</span>
+                        </strong>
+                    </article>
+                    <article class="status-card">
+                        <span class="status-label">Model</span>
+                        <strong id="llm-state" class="status-value">Checking</strong>
+                    </article>
+                    <article class="status-card">
+                        <span class="status-label">Nodes</span>
+                        <strong id="role-count" class="status-value stat-number">—</strong>
+                    </article>
+                    <article class="status-card">
+                        <span class="status-label">Edges</span>
+                        <strong id="edge-count" class="status-value stat-number">—</strong>
+                    </article>
+                </div>
+                <p class="runtime-message" id="runtime-message" role="status" aria-live="polite"></p>
+            </div>
+
+            <div class="hero-footer" data-animate="fade-up" aria-label="Data and product sources">
                 <span class="tech-badge">GraphRAG</span>
-                <span class="tech-badge">ONET</span>
+                <span class="tech-badge">O*NET</span>
                 <span class="tech-badge">ESCO</span>
-                <span class="tech-badge">Coursera</span>
+                <span class="tech-badge">Karrierewege</span>
             </div>
         </section>
 
-        <section class="chat-panel" id="chat-panel">
+        <section class="chat-panel" id="chat-panel" aria-labelledby="advisor-title">
             <div class="chat-toolbar">
                 <div class="toolbar-left">
-                    <div class="toolbar-indicator"></div>
-                    <h2>Career Advisor</h2>
+                    <span class="toolbar-indicator" aria-hidden="true"></span>
+                    <div>
+                        <p class="toolbar-kicker">Evidence-backed guidance</p>
+                        <h2 id="advisor-title">Career Advisor</h2>
+                    </div>
                 </div>
                 <button class="ghost-button" id="clear-chat" type="button">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-                    New Chat
+                    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 5v14M5 12h14"></path>
+                    </svg>
+                    <span>New chat</span>
                 </button>
             </div>
 
-            <div class="chat-log" id="chat-log" aria-live="polite">
+            <div class="chat-log" id="chat-log" role="log" aria-live="polite" aria-relevant="additions text" aria-busy="false" tabindex="0">
                 <article class="message message-assistant intro">
                     <div class="message-meta">
-                        <span class="meta-avatar">AI</span>
-                        Advisor
+                        <span class="meta-avatar" aria-hidden="true">AI</span>
+                        <span>Advisor</span>
                     </div>
                     <div class="message-bubble">
-                        Hi! I'm here to help you explore career paths. Tell me about your background, your degree or current role, your key skills, and what you're aiming for. I'll suggest roles that fit, highlight any skill gaps, and point you toward relevant courses.
+                        Tell me your degree or current role, the skills you already use,
+                        and the direction you want to move. I’ll map suitable roles,
+                        readiness evidence, skill gaps, and useful courses.
                     </div>
                 </article>
             </div>
 
             <form class="composer" id="chat-form">
-                <label class="composer-label" for="message-input">What are you looking for?</label>
+                <div class="composer-heading">
+                    <label class="composer-label" for="message-input">Describe your next move</label>
+                    <span class="composer-hint" id="composer-hint">Role or degree · skills · goal</span>
+                </div>
                 <div class="composer-row">
-                    <textarea id="message-input" name="message" rows="3" placeholder="Describe your background and what you're aiming for..." required></textarea>
+                    <textarea id="message-input" name="message" rows="3" maxlength="4000" placeholder="I’m a data analyst with Python and SQL experience, and I want to move into machine learning…" aria-describedby="composer-hint composer-status" required></textarea>
                     <button class="send-button" type="submit" id="send-btn">
-                        <span class="send-text">Get Advice</span>
-                        <svg class="send-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2L15 22l-4-9-9-4z"/></svg>
+                        <span class="send-text">Get advice</span>
+                        <svg class="send-icon" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 2 11 13"></path>
+                            <path d="m22 2-7 20-4-9-9-4Z"></path>
+                        </svg>
                     </button>
                 </div>
+                <p class="composer-status" id="composer-status" aria-live="polite"></p>
             </form>
         </section>
     </main>
-
-    <script src="{{ url_for('static', filename='chat.js') }}"></script>
 </body>
 </html>
