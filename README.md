@@ -20,7 +20,7 @@ A Flask career-guidance application backed by an ONET, ESCO, and Karrierewege kn
 
 4. Open `http://127.0.0.1:8001`.
 
-The repository includes the production graph at `graph/graph.gpickle` and its Chroma index at `index/chroma/`. Raw source datasets and experimental outputs are intentionally excluded.
+Local development reads the graph from `graph/graph.gpickle` and the Chroma index from `index/chroma/`. These data files, raw datasets, research notes, and experimental outputs stay on the local machine and are intentionally excluded from Git.
 
 ## Deploy to Vercel
 
@@ -32,6 +32,8 @@ Connect this repository and deploy the `dev` branch. Vercel detects `app.py` as 
 
 Common endpoint, model, and ranking settings can be overridden with the optional variables documented in `.env.example`.
 
+The deployment branch does not ship a graph or vector index. Before production deployment, connect `load_graph()` and `load_chroma_collection()` to the external graph and vector databases you choose, then configure that provider's connection variables in Vercel. The current loaders remain file-based for local development.
+
 ## Runtime structure
 
 ```text
@@ -42,6 +44,5 @@ coursera_client.py      Course lookup integration
 src/                     Retrieval, graph, and skill-gap pipeline
 templates/               Chat and graph pages
 public/                  Browser JavaScript and CSS
-graph/                   Precomputed knowledge graph
-index/chroma/            Precomputed semantic-search index
+external data stores     Graph and vector data (not committed)
 ```

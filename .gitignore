@@ -2,14 +2,9 @@
 .env
 /config.toml
 
-# --- Precomputed production assets ---
-# The deployed app needs exactly these graph/index files. Keep local backups
-# and alternate builds out of Git.
-graph/*
-!graph/graph.gpickle
-index/*
-!index/chroma/
-!index/chroma/**
+# --- Local graph and vector data (provided externally in deployment) ---
+graph/
+index/
 
 # --- Python ---
 __pycache__/
@@ -34,6 +29,16 @@ tests/
 /ARCHITECTURE.md
 /HANDOFF.md
 /novelty.md
+/add_toc.py
+/build_graph.py
+/build_vercel_bundle.py
+/career_kg_chat.py
+/coursera_api_check.py
+/test_apis.py
+/src/esco_preprocessing.py
+/src/graph_build.py
+/src/karrierewege_preprocessing.py
+/src/onet_preprocessing.py
 
 
 # --- OS ---

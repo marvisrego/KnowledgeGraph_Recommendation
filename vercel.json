@@ -2,8 +2,8 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
     "app.py": {
-      "includeFiles": "{graph/graph.gpickle,index/chroma/**,templates/**}",
-      "excludeFiles": "{.venv/**,venv/**,__pycache__/**,Data/**,artifacts/**,docs/**,evaluation/**,tests/**,.agents/**,.claude/**,.antigravitycli/**,public/**}"
+      "includeFiles": "templates/**",
+      "excludeFiles": "{.venv/**,venv/**,__pycache__/**,Data/**,artifacts/**,docs/**,evaluation/**,tests/**,.agents/**,.claude/**,.antigravitycli/**,public/**,graph/**,index/**}"
     }
   }
 }
