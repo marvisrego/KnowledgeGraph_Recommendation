@@ -18,12 +18,22 @@
 
     <div class="bg-atmosphere" aria-hidden="true">
         <div class="atmosphere-wash"></div>
+        <div class="atmosphere-grid"></div>
         <div class="noise-overlay"></div>
     </div>
 
     <main class="app-shell">
         <section class="hero-panel" id="hero-panel" aria-labelledby="product-title">
             <div class="hero-intro">
+                <div class="pipeline-indicator" data-animate="fade-up" aria-label="Agentic pipeline stages">
+                    <span class="pipeline-node"><span class="pipeline-node-dot"></span>Retrieve</span>
+                    <span class="pipeline-connector" aria-hidden="true"></span>
+                    <span class="pipeline-node"><span class="pipeline-node-dot"></span>Reason</span>
+                    <span class="pipeline-connector" aria-hidden="true"></span>
+                    <span class="pipeline-node"><span class="pipeline-node-dot"></span>Rank</span>
+                    <span class="pipeline-connector" aria-hidden="true"></span>
+                    <span class="pipeline-node"><span class="pipeline-node-dot"></span>Advise</span>
+                </div>
                 <p class="eyebrow" data-animate="fade-up">GraphRAG career intelligence</p>
                 <h1 id="product-title" data-animate="fade-up">
                     <span class="h1-line">Career Graph</span>

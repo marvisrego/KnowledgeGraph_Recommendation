@@ -337,6 +337,15 @@ function addCourseRecommendations(courses) {
     article.append(createMeta("Courses"), panel);
     chatLog.appendChild(article);
     scrollToLatest(article);
+
+    // Stagger course card entrance
+    if (!reducedMotion.matches && window.gsap) {
+        const cards = grid.querySelectorAll(".course-card");
+        window.gsap.fromTo(cards,
+            {opacity: 0, y: 16, scale: 0.97},
+            {opacity: 1, y: 0, scale: 1, duration: 0.4, stagger: 0.07, ease: "power3.out"}
+        );
+    }
 }
 
 function normalizedSource(source) {
@@ -426,6 +435,49 @@ function appendSkillGroup(roleNode, label, skills, state) {
     }
     group.append(groupLabel, skillRow);
     roleNode.appendChild(group);
+}
+
+function animateCareerPathCards(track) {
+    if (reducedMotion.matches || !window.gsap) return;
+    const cards = track.querySelectorAll(".path-role");
+    const arrows = track.querySelectorAll(".path-arrow");
+    if (cards.length === 0) return;
+    window.gsap.fromTo(cards,
+        {opacity: 0, y: 20, scale: 0.96},
+        {opacity: 1, y: 0, scale: 1, duration: 0.45, stagger: 0.08, ease: "power3.out"}
+    );
+    if (arrows.length > 0) {
+        window.gsap.fromTo(arrows,
+            {opacity: 0, x: -6},
+            {opacity: 1, x: 0, duration: 0.3, stagger: 0.08, delay: 0.12, ease: "power2.out"}
+        );
+    }
+}
+
+function animateExplanationSteps(panel) {
+    if (reducedMotion.matches || !window.gsap) return;
+    const steps = panel.querySelectorAll(".explanation-step");
+    if (steps.length === 0) return;
+    window.gsap.fromTo(steps,
+        {opacity: 0, x: -10},
+        {opacity: 1, x: 0, duration: 0.35, stagger: 0.06, ease: "power2.out"}
+    );
+}
+
+function animateCounter(element, targetValue) {
+    if (reducedMotion.matches || !window.gsap) {
+        element.textContent = targetValue.toLocaleString();
+        return;
+    }
+    const obj = {val: 0};
+    window.gsap.to(obj, {
+        val: targetValue,
+        duration: 1.2,
+        ease: "power2.out",
+        onUpdate: function() {
+            element.textContent = Math.round(obj.val).toLocaleString();
+        }
+    });
 }
 
 function addCareerPath(path) {
@@ -547,6 +599,7 @@ function addCareerPath(path) {
     article.append(createMeta("Career path"), panel);
     chatLog.appendChild(article);
     scrollToLatest(article);
+    animateCareerPathCards(track);
 }
 
 function renderAssistantPayload(payload) {
@@ -611,6 +664,13 @@ function addExplanationChains(explanations) {
     article.append(createMeta("Evidence"), panel);
     chatLog.appendChild(article);
     scrollToLatest(article);
+
+    // Animate steps when each details element opens
+    panel.querySelectorAll(".explanation-details").forEach((details) => {
+        details.addEventListener("toggle", () => {
+            if (details.open) animateExplanationSteps(details);
+        }, {once: true});
+    });
 }
 
 function showError(message, retry) {
@@ -673,8 +733,18 @@ async function loadStatus() {
         const payload = await parseJsonResponse(response, "Unable to load runtime status.");
         setRuntimeState(payload.ready ? "ready" : "unavailable", payload.ready ? "Ready" : "Unavailable");
         setText("llm-state", payload.chat_model || "Unknown");
-        setText("role-count", payload.graph_nodes != null ? Number(payload.graph_nodes).toLocaleString() : "—");
-        setText("edge-count", payload.graph_edges != null ? Number(payload.graph_edges).toLocaleString() : "—");
+        const roleCountEl = document.getElementById("role-count");
+        const edgeCountEl = document.getElementById("edge-count");
+        if (payload.graph_nodes != null && roleCountEl) {
+            animateCounter(roleCountEl, Number(payload.graph_nodes));
+        } else if (roleCountEl) {
+            roleCountEl.textContent = "—";
+        }
+        if (payload.graph_edges != null && edgeCountEl) {
+            animateCounter(edgeCountEl, Number(payload.graph_edges));
+        } else if (edgeCountEl) {
+            edgeCountEl.textContent = "—";
+        }
         runtimeMessage.textContent = payload.ready
             ? "Graph and semantic index are available."
             : (payload.error || "Connect the configured graph and vector stores to enable advice.");
