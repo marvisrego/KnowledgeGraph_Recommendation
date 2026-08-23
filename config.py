@@ -68,6 +68,19 @@ class Settings:
     transition_smoothing_temperature: float
     karrierewege_max_invalid_row_ratio: float
 
+    # --- Transition Effort Score ---
+    effort_weight_skill_gap: float
+    effort_weight_domain: float
+    effort_weight_empirical: float
+    effort_weight_transferability: float
+
+    # --- Link Prediction ---
+    link_prediction_enabled: bool
+    link_prediction_model_path: Path
+
+    # --- Agent orchestration ---
+    use_langgraph: bool
+
     @classmethod
     def from_env(cls, root: Path | None = None) -> "Settings":
         if root is None:
@@ -143,4 +156,14 @@ class Settings:
             karrierewege_max_invalid_row_ratio=float(
                 os.getenv("KARRIEREWEGE_MAX_INVALID_ROW_RATIO", "0.001")
             ),
+            # Effort
+            effort_weight_skill_gap=float(os.getenv("EFFORT_WEIGHT_SKILL_GAP", "0.35")),
+            effort_weight_domain=float(os.getenv("EFFORT_WEIGHT_DOMAIN", "0.15")),
+            effort_weight_empirical=float(os.getenv("EFFORT_WEIGHT_EMPIRICAL", "0.25")),
+            effort_weight_transferability=float(os.getenv("EFFORT_WEIGHT_TRANSFERABILITY", "0.25")),
+            # Link prediction
+            link_prediction_enabled=_bool("LINK_PREDICTION_ENABLED", False),
+            link_prediction_model_path=_path("LINK_PREDICTION_MODEL_PATH", "artifacts/link_prediction/link_predictor.pkl"),
+            # Agent orchestration
+            use_langgraph=_bool("USE_LANGGRAPH", False),
         )

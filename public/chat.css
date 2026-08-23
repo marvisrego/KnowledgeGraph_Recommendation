@@ -1033,6 +1033,71 @@ textarea::placeholder {
     white-space: nowrap;
 }
 
+.path-effort-badge {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    font-weight: 600;
+    white-space: nowrap;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+.effort-low {
+    color: var(--success);
+    background: rgba(91, 214, 162, 0.12);
+}
+.effort-moderate {
+    color: var(--warn);
+    background: rgba(241, 193, 91, 0.12);
+}
+.effort-high {
+    color: var(--error);
+    background: rgba(255, 145, 155, 0.12);
+}
+
+/* Explanation chains */
+.explanation-panel {
+    margin-top: 0.75rem;
+}
+.explanation-details {
+    margin-top: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-compact);
+    overflow: hidden;
+}
+.explanation-summary {
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    font-family: var(--font-ui);
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--ink);
+    background: var(--surface-raised);
+    user-select: none;
+}
+.explanation-summary:hover {
+    background: var(--surface-panel);
+}
+.explanation-chain {
+    padding: 0.5rem 0.75rem;
+    background: var(--surface-panel);
+    border-top: 1px solid var(--border);
+}
+.explanation-step {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    line-height: 1.6;
+    color: var(--ink-muted);
+    padding-left: 0.5rem;
+}
+.explanation-step.step-have {
+    color: var(--success);
+}
+.explanation-step.step-need {
+    color: var(--warn);
+}
+
 .path-role-title {
     color: var(--ink);
     font-size: 0.9rem;

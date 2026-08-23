@@ -2,7 +2,7 @@
 .env
 /config.toml
 
-# --- Local graph and vector data (provided externally in deployment) ---
+# --- Local graph and vector data (hosted externally in deployment) ---
 graph/
 index/
 
@@ -16,46 +16,48 @@ venv/
 dist/
 build/
 
-# --- Data / raw files ---
+# --- Data / raw files (not needed at runtime) ---
 Data/
 
-# --- Local reports, experiments, and generated artifacts ---
+# --- Local reports, experiments, trained models ---
 artifacts/
+models/
+
+# --- Documentation and project records (kept locally, not deployed) ---
 docs/
 evaluation/
 tests/
 /ALL_STEPS.md
-/ARCHITECTURE.html
-/ARCHITECTURE.md
 /HANDOFF.md
 /novelty.md
-/add_toc.py
+/ARCHITECTURE.html
+/ARCHITECTURE.md
+
+# --- Build/utility scripts (not needed at runtime) ---
 /build_graph.py
 /build_vercel_bundle.py
+/test_apis.py
+/add_toc.py
 /career_kg_chat.py
 /coursera_api_check.py
-/test_apis.py
+
+# --- Preprocessing modules (only needed for graph build, not runtime) ---
 /src/esco_preprocessing.py
 /src/graph_build.py
 /src/karrierewege_preprocessing.py
 /src/onet_preprocessing.py
 
-
 # --- OS ---
 .DS_Store
 Thumbs.db
 
-# --- Skills lock (tooling internal) ---
+# --- Local editor and agent tooling ---
+.claude/
+.agents/
+.antigravitycli/
 skills-lock.json
-
-# --- Local Codex runtime configuration (may contain credentials) ---
 ~/
 
-# --- Local editor and agent tooling ---
-.agents/
-.claude/
-.antigravitycli/
-
-# --- Removed legacy mirrors (root and public/ are authoritative) ---
+# --- Removed legacy ---
 CODE/
 static/

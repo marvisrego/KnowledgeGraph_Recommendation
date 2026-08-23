@@ -240,15 +240,22 @@ def create_app():
 
         try:
             transition_smoother = _load_transition_smoother(G, collection)
-            result = run_query(
-                query,
-                G,
-                collection,
-                settings,
-                history=messages,
-                transition_smoother=transition_smoother,
-            )
-            return jsonify({"status": "ok", "message": result["message"], "courses": result.get("courses", []), "path": result.get("path", {}), "explore": result.get("explore", {}), "evidence": result.get("evidence", {})})
+
+            if settings.use_langgraph:
+                from agents.graph import run_career_workflow
+                result = run_career_workflow(
+                    query, messages, settings, G, collection, transition_smoother
+                )
+            else:
+                result = run_query(
+                    query,
+                    G,
+                    collection,
+                    settings,
+                    history=messages,
+                    transition_smoother=transition_smoother,
+                )
+            return jsonify({"status": "ok", "message": result["message"], "courses": result.get("courses", []), "path": result.get("path", {}), "explore": result.get("explore", {}), "evidence": result.get("evidence", {}), "faithfulness": result.get("faithfulness"), "explanations": result.get("explanations", []), "metadata": result.get("metadata")})
         except Exception as exc:
             return jsonify({"status": "error", "message": str(exc)}), 500
 

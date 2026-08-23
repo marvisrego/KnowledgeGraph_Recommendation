@@ -455,6 +455,15 @@ function addCareerPath(path) {
             accessBadge.textContent = Math.round(role.accessibility * 100) + "% ready";
             cardTop.appendChild(accessBadge);
         }
+        if (role.effort_band) {
+            const effortBadge = document.createElement("span");
+            effortBadge.className = "path-effort-badge effort-" + role.effort_band;
+            effortBadge.textContent = role.effort_band.charAt(0).toUpperCase() + role.effort_band.slice(1) + " effort";
+            if (typeof role.effort_score === "number") {
+                effortBadge.title = "Transition Effort Score: " + (role.effort_score * 100).toFixed(0) + "%";
+            }
+            cardTop.appendChild(effortBadge);
+        }
 
         const title = document.createElement("h3");
         title.className = "path-role-title";
@@ -549,9 +558,59 @@ function renderAssistantPayload(payload) {
     if (payload.path && Array.isArray(payload.path.roles) && payload.path.roles.length) {
         addCareerPath(payload.path);
     }
+    if (Array.isArray(payload.explanations) && payload.explanations.length) {
+        addExplanationChains(payload.explanations);
+    }
     if (Array.isArray(payload.courses) && payload.courses.length) {
         addCourseRecommendations(payload.courses);
     }
+}
+
+function addExplanationChains(explanations) {
+    const article = document.createElement("article");
+    article.className = "chat-bubble assistant";
+    const panel = document.createElement("div");
+    panel.className = "explanation-panel";
+    const header = createPanelHeader("graph", "Why these roles?", "");
+    panel.appendChild(header);
+
+    explanations.forEach((exp) => {
+        const details = document.createElement("details");
+        details.className = "explanation-details";
+        const summary = document.createElement("summary");
+        summary.className = "explanation-summary";
+        summary.textContent = exp.role_title || "Role";
+        details.appendChild(summary);
+
+        const chain = document.createElement("div");
+        chain.className = "explanation-chain";
+        (exp.steps || []).forEach((step) => {
+            const line = document.createElement("div");
+            line.className = "explanation-step";
+            const relation = step.relation || "";
+            const target = step.target || "";
+            const attrs = step.attributes || {};
+            let text = "";
+            if (relation === "TRANSITIONS_TO") {
+                const pct = ((attrs.probability || 0) * 100).toFixed(1);
+                text = "→ TRANSITIONS_TO (" + pct + "%, n=" + (attrs.count || 0) + ") → " + target;
+            } else if (relation === "SIMILAR_TO") {
+                text = "→ SIMILAR_TO (" + (attrs.similarity || 0).toFixed(2) + ") → " + target;
+            } else if (relation === "REQUIRES") {
+                const marker = (attrs.status || "").includes("have") ? "(you have this)" : "(you need this)";
+                line.classList.add(attrs.transferable ? "step-have" : "step-need");
+                text = "→ REQUIRES → " + target + " " + marker;
+            }
+            line.textContent = text;
+            chain.appendChild(line);
+        });
+        details.appendChild(chain);
+        panel.appendChild(details);
+    });
+
+    article.append(createMeta("Evidence"), panel);
+    chatLog.appendChild(article);
+    scrollToLatest(article);
 }
 
 function showError(message, retry) {

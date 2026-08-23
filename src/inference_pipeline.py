@@ -949,10 +949,57 @@ def run_query(
     # 7. Build linear path data for frontend visual
     path_data = _build_path_data(anchor_ids, triples, G, ranked_candidates=top_candidates)
 
+    # 7b. Compute Transition Effort Scores for each role in the path
+    try:
+        from src.transition_effort import transition_effort_score, get_idf_map, EffortWeights
+
+        if current_role_id and path_data.get("roles"):
+            idf_map = get_idf_map(G)
+            weights = EffortWeights(
+                skill_gap=settings.effort_weight_skill_gap,
+                domain=settings.effort_weight_domain,
+                empirical=settings.effort_weight_empirical,
+                transferability=settings.effort_weight_transferability,
+            )
+            for role_entry in path_data["roles"]:
+                target_id = role_entry["id"]
+                if target_id == current_role_id:
+                    continue
+                effort = transition_effort_score(
+                    current_role_id, target_id,
+                    skill_evidence["skill_ids"], G, idf_map, weights,
+                    transition_smoother,
+                )
+                role_entry["effort_score"] = round(effort.score, 4)
+                role_entry["effort_band"] = effort.band
+    except Exception as exc:
+        print(f"[inference_pipeline] Effort scoring failed (non-critical): {exc}")
+
+    # 7c. Faithfulness verification
+    faithfulness_result = None
+    try:
+        from src.faithfulness import compute_faithfulness
+        faithfulness_result = compute_faithfulness(response, anchor_ids, G)
+    except Exception as exc:
+        print(f"[inference_pipeline] Faithfulness check failed (non-critical): {exc}")
+
+    # 7d. Explanation chains
+    explanations = []
+    try:
+        from src.explainability import explain_career_path
+        if current_role_id and path_data.get("roles"):
+            explanations = explain_career_path(
+                path_data["roles"], current_role_id, skill_evidence["skill_ids"], G
+            )
+    except Exception as exc:
+        print(f"[inference_pipeline] Explanation generation failed (non-critical): {exc}")
+
     return {
         "message": response,
         "courses": courses,
         "path": path_data,
         "explore": {},
         "evidence": public_evidence,
+        "faithfulness": faithfulness_result.to_dict() if faithfulness_result else None,
+        "explanations": explanations,
     }

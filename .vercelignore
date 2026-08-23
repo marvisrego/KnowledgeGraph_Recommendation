@@ -6,6 +6,7 @@ __pycache__/
 *.py[cod]
 Data/
 artifacts/
+models/
 docs/
 evaluation/
 tests/
@@ -15,6 +16,7 @@ tests/
 skills-lock.json
 HANDOFF.md
 ALL_STEPS.md
+novelty.md
 ~/
 CODE/
 static/
