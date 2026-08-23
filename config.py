@@ -47,8 +47,10 @@ class Settings:
     # --- File paths ---
     onet_dir: Path
     esco_dir: Path
+    karrierewege_dir: Path
     graph_path: Path
     chroma_dir: Path
+    karrierewege_report_path: Path
 
     # --- Tuning ---
     embed_batch_size: int
@@ -56,6 +58,28 @@ class Settings:
     retrieval_top_k: int
     rerank_top_n: int
     onet_importance_threshold: float
+    transition_min_count: int
+    transition_chunk_size: int
+    transition_candidate_limit: int
+    transition_traversal_limit: int
+    transition_smoothing_enabled: bool
+    transition_smoothing_neighbours: int
+    transition_smoothing_direct_weight: float
+    transition_smoothing_temperature: float
+    karrierewege_max_invalid_row_ratio: float
+
+    # --- Transition Effort Score ---
+    effort_weight_skill_gap: float
+    effort_weight_domain: float
+    effort_weight_empirical: float
+    effort_weight_transferability: float
+
+    # --- Link Prediction ---
+    link_prediction_enabled: bool
+    link_prediction_model_path: Path
+
+    # --- Agent orchestration ---
+    use_langgraph: bool
 
     @classmethod
     def from_env(cls, root: Path | None = None) -> "Settings":
@@ -65,6 +89,12 @@ class Settings:
 
         def _path(key: str, default: str) -> Path:
             return root / os.getenv(key, default)
+
+        def _bool(key: str, default: bool) -> bool:
+            value = os.getenv(key)
+            if value is None:
+                return default
+            return value.strip().casefold() in {"1", "true", "yes", "on"}
 
         return cls(
             # Chat
@@ -94,14 +124,46 @@ class Settings:
                 "ESCO_DIR",
                 "Data/ESCO dataset - v1.2.1 - classification - en - csv",
             ),
+            karrierewege_dir=_path("KARRIEREWEGE_DIR", "Data/Karrierewege"),
             graph_path=_path("GRAPH_PATH", "graph/graph.gpickle"),
             chroma_dir=_path("CHROMA_DIR", "index/chroma"),
+            karrierewege_report_path=_path(
+                "KARRIEREWEGE_REPORT_PATH",
+                "artifacts/karrierewege/data_quality.json",
+            ),
             # Tuning
             embed_batch_size=int(os.getenv("EMBED_BATCH_SIZE", "100")),
             similarity_threshold=float(os.getenv("SIMILARITY_THRESHOLD", "0.85")),
             retrieval_top_k=int(os.getenv("RETRIEVAL_TOP_K", "50")),
-            rerank_top_n=int(os.getenv("RERANK_TOP_N", "5")),
+            rerank_top_n=int(os.getenv("RERANK_TOP_N", "8")),
             onet_importance_threshold=float(
                 os.getenv("ONET_IMPORTANCE_THRESHOLD", "3.0")
             ),
+            transition_min_count=int(os.getenv("TRANSITION_MIN_COUNT", "5")),
+            transition_chunk_size=int(os.getenv("TRANSITION_CHUNK_SIZE", "200000")),
+            transition_candidate_limit=int(os.getenv("TRANSITION_CANDIDATE_LIMIT", "12")),
+            transition_traversal_limit=int(os.getenv("TRANSITION_TRAVERSAL_LIMIT", "8")),
+            transition_smoothing_enabled=_bool("TRANSITION_SMOOTHING_ENABLED", True),
+            transition_smoothing_neighbours=int(
+                os.getenv("TRANSITION_SMOOTHING_NEIGHBOURS", "20")
+            ),
+            transition_smoothing_direct_weight=float(
+                os.getenv("TRANSITION_SMOOTHING_DIRECT_WEIGHT", "0.90")
+            ),
+            transition_smoothing_temperature=float(
+                os.getenv("TRANSITION_SMOOTHING_TEMPERATURE", "0.05")
+            ),
+            karrierewege_max_invalid_row_ratio=float(
+                os.getenv("KARRIEREWEGE_MAX_INVALID_ROW_RATIO", "0.001")
+            ),
+            # Effort
+            effort_weight_skill_gap=float(os.getenv("EFFORT_WEIGHT_SKILL_GAP", "0.35")),
+            effort_weight_domain=float(os.getenv("EFFORT_WEIGHT_DOMAIN", "0.15")),
+            effort_weight_empirical=float(os.getenv("EFFORT_WEIGHT_EMPIRICAL", "0.25")),
+            effort_weight_transferability=float(os.getenv("EFFORT_WEIGHT_TRANSFERABILITY", "0.25")),
+            # Link prediction
+            link_prediction_enabled=_bool("LINK_PREDICTION_ENABLED", False),
+            link_prediction_model_path=_path("LINK_PREDICTION_MODEL_PATH", "artifacts/link_prediction/link_predictor.pkl"),
+            # Agent orchestration
+            use_langgraph=_bool("USE_LANGGRAPH", False),
         )

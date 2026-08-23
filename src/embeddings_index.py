@@ -8,6 +8,10 @@ from __future__ import annotations
 
 import json
 import math
+import os
+import shutil
+import tempfile
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -18,6 +22,10 @@ import networkx as nx
 
 if TYPE_CHECKING:
     from config import Settings
+
+
+_RUNTIME_CHROMA_DIR: Path | None = None
+_RUNTIME_CHROMA_LOCK = threading.Lock()
 
 
 # ---------------------------------------------------------------------------
@@ -91,6 +99,32 @@ def embed_texts(texts: list[str], settings: "Settings") -> list[list[float]]:
 # ChromaDB index
 # ---------------------------------------------------------------------------
 
+def _queryable_chroma_dir(source_dir: Path) -> Path:
+    """Return a writable Chroma directory for the current runtime.
+
+    Vercel packages application files on a read-only filesystem, while Chroma
+    updates its SQLite store when a ``PersistentClient`` opens it. Copy the
+    bundled index to the function's writable temporary directory once per
+    process. Local development continues to use the configured directory.
+    """
+    source_dir = Path(source_dir)
+    if not os.getenv("VERCEL"):
+        return source_dir
+
+    global _RUNTIME_CHROMA_DIR
+    with _RUNTIME_CHROMA_LOCK:
+        if _RUNTIME_CHROMA_DIR is not None:
+            return _RUNTIME_CHROMA_DIR
+        if not source_dir.is_dir():
+            raise FileNotFoundError(f"Packaged ChromaDB directory not found: {source_dir}")
+
+        runtime_dir = (
+            Path(tempfile.gettempdir()) / f"career-kg-chroma-{os.getpid()}"
+        )
+        shutil.copytree(source_dir, runtime_dir, dirs_exist_ok=True)
+        _RUNTIME_CHROMA_DIR = runtime_dir
+        return runtime_dir
+
 def _build_role_text(node_id: str, data: dict) -> str:
     parts = [data.get("title", node_id)]
     if data.get("description"):
@@ -102,6 +136,11 @@ def _build_role_text(node_id: str, data: dict) -> str:
     if data.get("isco_group"):
         parts.append(f"ISCO group: {data['isco_group']}")
     return "\n".join(parts)
+
+
+def build_role_text(node_id: str, data: dict) -> str:
+    """Public role-document builder shared by indexing and candidate expansion."""
+    return _build_role_text(node_id, data)
 
 
 def _safe_metadata(data: dict) -> dict:
@@ -119,7 +158,7 @@ def _safe_metadata(data: dict) -> dict:
     return safe
 
 
-def build_chroma_index(G: nx.DiGraph, settings: "Settings") -> None:
+def build_chroma_index(G: nx.MultiDiGraph, settings: "Settings") -> None:
     """Embed all role nodes and store them in a persistent ChromaDB collection."""
     try:
         import chromadb
@@ -176,14 +215,15 @@ def load_chroma_collection(settings: "Settings"):
         ) from None
 
     try:
-        client = chromadb.PersistentClient(path=str(settings.chroma_dir))
+        chroma_dir = _queryable_chroma_dir(settings.chroma_dir)
+        client = chromadb.PersistentClient(path=str(chroma_dir))
         collection = client.get_collection("roles_collection")
         return collection
     except Exception as exc:
         raise RuntimeError(
             f"[embeddings_index] Failed to load ChromaDB collection from "
             f"{settings.chroma_dir}: {exc}. "
-            "Run 'python build_graph.py --embed' first."
+            "Ensure the packaged ChromaDB index is present and compatible."
         ) from exc
 
 
@@ -192,7 +232,7 @@ def load_chroma_collection(settings: "Settings"):
 # ---------------------------------------------------------------------------
 
 def compute_alignment_edges(
-    G: nx.DiGraph,
+    G: nx.MultiDiGraph,
     settings: "Settings",
 ) -> list[tuple[str, str, float]]:
     """Compute cosine similarity between ONET and ESCO role embeddings.

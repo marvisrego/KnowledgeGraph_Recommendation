@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -8,9 +9,10 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).parent))
 
 from config import Settings
-from src.graph_build import load_graph
+from src.graph_store import load_graph
 from src.embeddings_index import load_chroma_collection
 from src.inference_pipeline import run_query
+from src.transition_embedding import RuntimeTransitionSmoother, SmoothingConfig
 
 
 def create_app():
@@ -26,7 +28,15 @@ def create_app():
     settings = Settings.from_env(Path(__file__).resolve().parent)
 
     # --- Lazy-load graph and ChromaDB (once per process) ---
-    _cache: dict[str, Any] = {"graph": None, "collection": None, "error": None}
+    _cache: dict[str, Any] = {
+        "graph": None,
+        "collection": None,
+        "error": None,
+        "transition_smoother": None,
+        "transition_smoother_attempted": False,
+        "transition_smoother_error": None,
+    }
+    _smoother_lock = threading.Lock()
 
     def _load_resources() -> tuple:
         if _cache["graph"] is None:
@@ -40,6 +50,32 @@ def create_app():
             except RuntimeError as exc:
                 _cache["error"] = str(exc)
         return _cache["graph"], _cache["collection"]
+
+    def _load_transition_smoother(G, collection):
+        if not settings.transition_smoothing_enabled or G is None or collection is None:
+            return None
+        if _cache["transition_smoother_attempted"]:
+            return _cache["transition_smoother"]
+        with _smoother_lock:
+            if _cache["transition_smoother_attempted"]:
+                return _cache["transition_smoother"]
+            try:
+                config = SmoothingConfig(
+                    neighbours=settings.transition_smoothing_neighbours,
+                    direct_weight=settings.transition_smoothing_direct_weight,
+                    temperature=settings.transition_smoothing_temperature,
+                )
+                _cache["transition_smoother"] = RuntimeTransitionSmoother(
+                    G,
+                    collection,
+                    config,
+                )
+            except Exception as exc:
+                _cache["transition_smoother_error"] = str(exc)
+                print(f"[career_kg_web] Transition smoothing unavailable: {exc}")
+            finally:
+                _cache["transition_smoother_attempted"] = True
+        return _cache["transition_smoother"]
 
     @app.get("/")
     def index():
@@ -84,7 +120,8 @@ def create_app():
             }})
 
         def _add_edge(src, dst, attrs):
-            eid = f"{src}__{dst}"
+            relation = attrs.get("relation", "EDGE")
+            eid = f"{src}__{relation}__{dst}"
             if eid in seen_edges:
                 return
             seen_edges.add(eid)
@@ -101,6 +138,27 @@ def create_app():
             for _, dst, ed in G.out_edges(src, data=True):
                 if ed.get("relation") == "SIMILAR_TO" and dst in sampled_roles:
                     _add_edge(src, dst, {"relation": "SIMILAR_TO", "similarity": round(ed.get("similarity", 0), 2)})
+
+        # Strongest empirical transitions between sampled roles, globally capped.
+        transition_edges = []
+        for src in sampled_roles:
+            for _, dst, ed in G.out_edges(src, data=True):
+                if ed.get("relation") == "TRANSITIONS_TO" and dst in sampled_roles:
+                    transition_edges.append((src, dst, ed))
+        transition_edges.sort(
+            key=lambda item: (
+                -float(item[2].get("probability", 0.0)),
+                -int(item[2].get("count", 0)),
+                str(item[0]),
+                str(item[1]),
+            )
+        )
+        for src, dst, ed in transition_edges[:120]:
+            _add_edge(src, dst, {
+                "relation": "TRANSITIONS_TO",
+                "count": int(ed.get("count", 0)),
+                "probability": round(float(ed.get("probability", 0.0)), 4),
+            })
 
         # Top-4 essential REQUIRES edges per role, skill nodes capped at 160
         for nid in sampled_roles:
@@ -136,6 +194,17 @@ def create_app():
                 "chroma_loaded": collection is not None,
                 "graph_nodes": G.number_of_nodes() if G else 0,
                 "graph_edges": G.number_of_edges() if G else 0,
+                "transition_edges": (
+                    sum(
+                        1
+                        for _, _, data in G.edges(data=True)
+                        if data.get("relation") == "TRANSITIONS_TO"
+                    )
+                    if G else 0
+                ),
+                "transition_smoothing_enabled": settings.transition_smoothing_enabled,
+                "transition_smoothing_loaded": _cache["transition_smoother"] is not None,
+                "transition_smoothing_error": _cache["transition_smoother_error"],
                 "chat_model": settings.chat_model,
                 "embed_model": settings.embed_model,
                 "rerank_model": settings.cohere_rerank_model,
@@ -170,8 +239,23 @@ def create_app():
             ), 503
 
         try:
-            result = run_query(query, G, collection, settings, history=messages)
-            return jsonify({"status": "ok", "message": result["message"], "courses": result.get("courses", [])})
+            transition_smoother = _load_transition_smoother(G, collection)
+
+            if settings.use_langgraph:
+                from agents.graph import run_career_workflow
+                result = run_career_workflow(
+                    query, messages, settings, G, collection, transition_smoother
+                )
+            else:
+                result = run_query(
+                    query,
+                    G,
+                    collection,
+                    settings,
+                    history=messages,
+                    transition_smoother=transition_smoother,
+                )
+            return jsonify({"status": "ok", "message": result["message"], "courses": result.get("courses", []), "path": result.get("path", {}), "explore": result.get("explore", {}), "evidence": result.get("evidence", {}), "faithfulness": result.get("faithfulness"), "explanations": result.get("explanations", []), "metadata": result.get("metadata")})
         except Exception as exc:
             return jsonify({"status": "error", "message": str(exc)}), 500
 

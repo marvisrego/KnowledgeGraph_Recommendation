@@ -1,7 +1,8 @@
 # --- Secrets ---
 .env
+/config.toml
 
-# --- Built artifacts (regenerate with build_graph.py --embed) ---
+# --- Local graph and vector data (hosted externally in deployment) ---
 graph/
 index/
 
@@ -15,23 +16,48 @@ venv/
 dist/
 build/
 
-# --- Data / raw files ---
+# --- Data / raw files (not needed at runtime) ---
 Data/
 
-# --- Misc artifacts ---
-artifacts/career_kg_bundle.pkl
-artifacts/linkedin_kg_bundle.pkl
-artifacts/monster_kg_bundle.pkl
-artifacts/docx_transcripts/
+# --- Local reports, experiments, trained models ---
+artifacts/
+models/
 
-# --- Claude / agent internals ---
-.claude/
-.agents/
-.antigravitycli/
+# --- Documentation and project records (kept locally, not deployed) ---
+docs/
+evaluation/
+tests/
+/ALL_STEPS.md
+/HANDOFF.md
+/novelty.md
+/ARCHITECTURE.html
+/ARCHITECTURE.md
+
+# --- Build/utility scripts (not needed at runtime) ---
+/build_graph.py
+/build_vercel_bundle.py
+/test_apis.py
+/add_toc.py
+/career_kg_chat.py
+/coursera_api_check.py
+
+# --- Preprocessing modules (only needed for graph build, not runtime) ---
+/src/esco_preprocessing.py
+/src/graph_build.py
+/src/karrierewege_preprocessing.py
+/src/onet_preprocessing.py
 
 # --- OS ---
 .DS_Store
 Thumbs.db
 
-# --- Skills lock (tooling internal) ---
+# --- Local editor and agent tooling ---
+.claude/
+.agents/
+.antigravitycli/
 skills-lock.json
+~/
+
+# --- Removed legacy ---
+CODE/
+static/
