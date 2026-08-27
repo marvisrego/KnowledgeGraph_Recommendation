@@ -8,13 +8,18 @@ from typing import Any
 from agents.state import CareerAgentState
 
 
-def retrieval_node(state: CareerAgentState, *, settings, G, collection, transition_smoother=None, **kwargs) -> dict[str, Any]:
-    """Embed query, retrieve from ChromaDB, augment with transitions."""
-    from src.inference_pipeline import (
-        retrieve_candidates,
-        filter_candidates_to_graph,
-        augment_candidates_with_transitions,
-    )
+def retrieval_node(
+    state: CareerAgentState,
+    *,
+    settings,
+    G,
+    collection,
+    transition_smoother=None,
+    link_prediction_runtime=None,
+    **kwargs,
+) -> dict[str, Any]:
+    """Resolve evidence and run the shared multi-source retriever."""
+    from src.hybrid_retrieval import hybrid_retrieve
     from src.skill_gap import resolve_current_role, resolve_user_skills
 
     t0 = time.time()
@@ -52,26 +57,15 @@ def retrieval_node(state: CareerAgentState, *, settings, G, collection, transiti
         "excluded_non_owned_skills": skill_evidence.get("excluded", []),
     }
 
-    # Vector retrieval
-    try:
-        candidates = retrieve_candidates(query, collection, settings)
-    except RuntimeError:
-        return {"candidates": [], "errors": ["retrieval_failed"], "skill_evidence": skill_evidence, "current_role_id": current_role_id, "public_evidence": public_evidence}
-
-    candidates = filter_candidates_to_graph(candidates, G)
-
-    # Transition augmentation
-    smoothed_destinations = []
-    if transition_smoother and current_role_id:
-        try:
-            smoothed_destinations = transition_smoother.rank(current_role_id, settings.transition_candidate_limit)
-        except Exception:
-            pass
-
-    candidates = augment_candidates_with_transitions(
-        candidates, current_role_id, G,
-        limit=settings.transition_candidate_limit,
-        smoothed_destinations=smoothed_destinations,
+    candidates = hybrid_retrieve(
+        query,
+        collection,
+        skill_evidence["skill_ids"],
+        current_role_id,
+        G,
+        settings,
+        transition_smoother=transition_smoother,
+        link_prediction_runtime=link_prediction_runtime,
     )
 
     return {

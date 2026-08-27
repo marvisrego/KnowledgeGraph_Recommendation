@@ -34,13 +34,26 @@ def traversal_node(state: CareerAgentState, *, settings, G, **kwargs) -> dict[st
         if not transition or not current_role_id:
             continue
         evidence_type = transition.get("evidence_type", "direct_transition")
-        relation = "SEMANTIC_TRANSITION_BACKOFF" if evidence_type == "semantic_transition_backoff" else "TRANSITIONS_TO"
+        relation = {
+            "semantic_transition_backoff": "SEMANTIC_TRANSITION_BACKOFF",
+            "predicted_transition": "PREDICTED_TRANSITION",
+        }.get(evidence_type, "TRANSITIONS_TO")
         key = (current_role_id, candidate["id"])
         if relation == "TRANSITIONS_TO" and key in seen_transition_triples:
             continue
         triples.append((
             current_role_id, relation, candidate["id"],
-            {"relation": relation, "source": "embedding_smoothing" if relation == "SEMANTIC_TRANSITION_BACKOFF" else "karrierewege", **transition},
+            {
+                "relation": relation,
+                "source": (
+                    "embedding_smoothing"
+                    if relation == "SEMANTIC_TRANSITION_BACKOFF"
+                    else "link_prediction"
+                    if relation == "PREDICTED_TRANSITION"
+                    else "karrierewege"
+                ),
+                **transition,
+            },
         ))
         if relation == "TRANSITIONS_TO":
             seen_transition_triples.add(key)

@@ -13,6 +13,8 @@ from src.graph_store import load_graph
 from src.embeddings_index import load_chroma_collection
 from src.inference_pipeline import run_query
 from src.transition_embedding import RuntimeTransitionSmoother, SmoothingConfig
+from src.transition_policy import is_training_transition
+from src.hybrid_retrieval import build_link_prediction_runtime
 
 
 def create_app():
@@ -35,20 +37,27 @@ def create_app():
         "transition_smoother": None,
         "transition_smoother_attempted": False,
         "transition_smoother_error": None,
+        "link_prediction_runtime": None,
+        "link_prediction_attempted": False,
+        "link_prediction_error": None,
     }
+    _resource_lock = threading.Lock()
     _smoother_lock = threading.Lock()
+    _link_prediction_lock = threading.Lock()
 
     def _load_resources() -> tuple:
-        if _cache["graph"] is None:
-            try:
-                _cache["graph"] = load_graph(settings.graph_path)
-            except RuntimeError as exc:
-                _cache["error"] = str(exc)
-        if _cache["collection"] is None:
-            try:
-                _cache["collection"] = load_chroma_collection(settings)
-            except RuntimeError as exc:
-                _cache["error"] = str(exc)
+        if _cache["graph"] is None or _cache["collection"] is None:
+            with _resource_lock:
+                if _cache["graph"] is None:
+                    try:
+                        _cache["graph"] = load_graph(settings.graph_path)
+                    except RuntimeError as exc:
+                        _cache["error"] = str(exc)
+                if _cache["collection"] is None:
+                    try:
+                        _cache["collection"] = load_chroma_collection(settings)
+                    except RuntimeError as exc:
+                        _cache["error"] = str(exc)
         return _cache["graph"], _cache["collection"]
 
     def _load_transition_smoother(G, collection):
@@ -76,6 +85,27 @@ def create_app():
             finally:
                 _cache["transition_smoother_attempted"] = True
         return _cache["transition_smoother"]
+
+    def _load_link_prediction_runtime(G, collection):
+        if not settings.link_prediction_enabled or G is None or collection is None:
+            return None
+        if _cache["link_prediction_attempted"]:
+            return _cache["link_prediction_runtime"]
+        with _link_prediction_lock:
+            if _cache["link_prediction_attempted"]:
+                return _cache["link_prediction_runtime"]
+            try:
+                _cache["link_prediction_runtime"] = build_link_prediction_runtime(
+                    settings.link_prediction_model_path,
+                    G,
+                    collection,
+                )
+            except Exception as exc:
+                _cache["link_prediction_error"] = str(exc)
+                print(f"[career_kg_web] Link prediction unavailable: {exc}")
+            finally:
+                _cache["link_prediction_attempted"] = True
+        return _cache["link_prediction_runtime"]
 
     @app.get("/")
     def index():
@@ -143,7 +173,7 @@ def create_app():
         transition_edges = []
         for src in sampled_roles:
             for _, dst, ed in G.out_edges(src, data=True):
-                if ed.get("relation") == "TRANSITIONS_TO" and dst in sampled_roles:
+                if is_training_transition(ed) and dst in sampled_roles:
                     transition_edges.append((src, dst, ed))
         transition_edges.sort(
             key=lambda item: (
@@ -187,6 +217,8 @@ def create_app():
     @app.get("/api/status")
     def status():
         G, collection = _load_resources()
+        transition_smoother = _load_transition_smoother(G, collection)
+        link_prediction_runtime = _load_link_prediction_runtime(G, collection)
         return jsonify(
             {
                 "ready": G is not None and collection is not None,
@@ -198,13 +230,21 @@ def create_app():
                     sum(
                         1
                         for _, _, data in G.edges(data=True)
-                        if data.get("relation") == "TRANSITIONS_TO"
+                        if is_training_transition(data)
                     )
                     if G else 0
                 ),
                 "transition_smoothing_enabled": settings.transition_smoothing_enabled,
-                "transition_smoothing_loaded": _cache["transition_smoother"] is not None,
+                "transition_smoothing_loaded": transition_smoother is not None,
                 "transition_smoothing_error": _cache["transition_smoother_error"],
+                "link_prediction_enabled": settings.link_prediction_enabled,
+                "link_prediction_loaded": link_prediction_runtime is not None,
+                "link_prediction_error": _cache["link_prediction_error"],
+                "link_prediction_diagnostics": (
+                    link_prediction_runtime.diagnostics()
+                    if link_prediction_runtime is not None
+                    else None
+                ),
                 "chat_model": settings.chat_model,
                 "embed_model": settings.embed_model,
                 "rerank_model": settings.cohere_rerank_model,
@@ -240,11 +280,18 @@ def create_app():
 
         try:
             transition_smoother = _load_transition_smoother(G, collection)
+            link_prediction_runtime = _load_link_prediction_runtime(G, collection)
 
             if settings.use_langgraph:
                 from agents.graph import run_career_workflow
                 result = run_career_workflow(
-                    query, messages, settings, G, collection, transition_smoother
+                    query,
+                    messages,
+                    settings,
+                    G,
+                    collection,
+                    transition_smoother,
+                    link_prediction_runtime,
                 )
             else:
                 result = run_query(
@@ -254,6 +301,7 @@ def create_app():
                     settings,
                     history=messages,
                     transition_smoother=transition_smoother,
+                    link_prediction_runtime=link_prediction_runtime,
                 )
             return jsonify({"status": "ok", "message": result["message"], "courses": result.get("courses", []), "path": result.get("path", {}), "explore": result.get("explore", {}), "evidence": result.get("evidence", {}), "faithfulness": result.get("faithfulness"), "explanations": result.get("explanations", []), "metadata": result.get("metadata")})
         except Exception as exc:

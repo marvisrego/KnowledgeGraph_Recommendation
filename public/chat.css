@@ -574,7 +574,8 @@ h3 {
 
 .message-explore,
 .message-path,
-.message-courses {
+.message-courses,
+.message-evidence {
     width: 100%;
     max-width: 100%;
 }

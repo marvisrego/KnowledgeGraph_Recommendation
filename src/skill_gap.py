@@ -10,6 +10,7 @@ from typing import Iterable
 import networkx as nx
 
 from src.text_normalization import normalize_label
+from src.transition_policy import is_training_transition
 
 
 _POSSESSION_MARKERS = re.compile(
@@ -19,7 +20,7 @@ _POSSESSION_MARKERS = re.compile(
     re.IGNORECASE,
 )
 _NEGATION_MARKERS = re.compile(
-    r"\b(?:do\s+not|don't|dont|not|never|without|lack(?:ing)?|need\s+to\s+learn|want\s+to\s+learn)\b",
+    r"\b(?:do\s+not|don\s+t|dont|no|not|never|without|lack(?:ing)?|need\s+to\s+learn|want\s+to\s+learn)\b",
     re.IGNORECASE,
 )
 _GOAL_MARKERS = re.compile(
@@ -205,6 +206,27 @@ def _esco_requirements(role_id: str, G: nx.MultiDiGraph) -> set[str]:
     return requirements
 
 
+def _onet_requirements(
+    role_id: str,
+    G: nx.MultiDiGraph,
+    importance_threshold: float,
+) -> set[str]:
+    """Return high-importance O*NET requirements for an unaligned role."""
+    requirements: set[str] = set()
+    for _, target, data in G.out_edges(role_id, data=True):
+        if data.get("relation") != "REQUIRES" or data.get("source") != "onet":
+            continue
+        try:
+            importance = float(data.get("requirement_level"))
+        except (TypeError, ValueError):
+            continue
+        if importance < importance_threshold:
+            continue
+        if G.has_node(target) and G.nodes[target].get("type") in ("skill", "element"):
+            requirements.add(str(target))
+    return requirements
+
+
 def aligned_esco_role(role_id: str, G: nx.MultiDiGraph) -> str | None:
     """Return the strongest ESCO role aligned with an ONET role."""
     candidates: list[tuple[float, str]] = []
@@ -217,7 +239,11 @@ def aligned_esco_role(role_id: str, G: nx.MultiDiGraph) -> str | None:
     return max(candidates, default=(0.0, None), key=lambda item: (item[0], item[1] or ""))[1]
 
 
-def role_requirements(role_id: str, G: nx.MultiDiGraph) -> tuple[set[str], str, str | None]:
+def role_requirements(
+    role_id: str,
+    G: nx.MultiDiGraph,
+    onet_importance_threshold: float = 3.5,
+) -> tuple[set[str], str, str | None]:
     """Return comparable ESCO requirements, evidence status, and evidence role."""
     if not G.has_node(role_id):
         return set(), "role_missing", None
@@ -230,7 +256,8 @@ def role_requirements(role_id: str, G: nx.MultiDiGraph) -> tuple[set[str], str, 
         if aligned:
             required = _esco_requirements(aligned, G)
             return required, "aligned_esco" if required else "no_requirements", aligned
-        return set(), "no_esco_alignment", None
+        required = _onet_requirements(role_id, G, onet_importance_threshold)
+        return required, "direct_onet" if required else "no_esco_alignment", role_id
     return set(), "unsupported_role_source", None
 
 
@@ -249,9 +276,12 @@ def compute_skill_gap(
     role_id: str,
     G: nx.MultiDiGraph,
     display_limit: int = 5,
+    onet_importance_threshold: float = 3.5,
 ) -> dict:
     """Compute graph-structural overlap without treating missing evidence as zero."""
-    required, evidence, evidence_role_id = role_requirements(role_id, G)
+    required, evidence, evidence_role_id = role_requirements(
+        role_id, G, onet_importance_threshold
+    )
     owned = set(user_skill_ids)
     if not required:
         return {
@@ -271,7 +301,13 @@ def compute_skill_gap(
     have = required.intersection(owned)
     need = required.difference(owned)
     has_user_evidence = bool(owned)
-    accessibility = len(have) / len(required) if has_user_evidence else None
+    total_weight = sum(float(G.nodes[sid].get("idf", 1.0)) for sid in required)
+    have_weight = sum(float(G.nodes[sid].get("idf", 1.0)) for sid in have)
+    accessibility = (
+        have_weight / total_weight
+        if has_user_evidence and total_weight > 0
+        else (0.0 if has_user_evidence else None)
+    )
     gap = 1.0 - accessibility if accessibility is not None else None
     status = evidence if has_user_evidence else "no_user_skills"
     return {
@@ -338,8 +374,7 @@ def transition_evidence(
         data
         for _, target, data in G.out_edges(source_role_id, data=True)
         if str(target) == str(target_role_id)
-        and data.get("relation") == "TRANSITIONS_TO"
-        and data.get("source") == "karrierewege"
+        and is_training_transition(data)
     ]
     if not evidence:
         return None
@@ -365,7 +400,7 @@ def transition_destinations(
         return []
     rows: list[dict] = []
     for _, target, data in G.out_edges(source_role_id, data=True):
-        if data.get("relation") != "TRANSITIONS_TO" or data.get("source") != "karrierewege":
+        if not is_training_transition(data):
             continue
         rows.append(
             {
@@ -396,12 +431,19 @@ def rank_roles_by_gap(
     G: nx.MultiDiGraph,
     current_role_id: str | None = None,
     display_limit: int = 5,
+    onet_importance_threshold: float = 3.5,
 ) -> list[dict]:
     """Annotate and stably order a semantically shortlisted candidate list."""
     ranked: list[dict] = []
     for candidate in candidates:
         role_id = str(candidate["id"])
-        gap = compute_skill_gap(user_skill_ids, role_id, G, display_limit=display_limit)
+        gap = compute_skill_gap(
+            user_skill_ids,
+            role_id,
+            G,
+            display_limit=display_limit,
+            onet_importance_threshold=onet_importance_threshold,
+        )
         transition = candidate.get("transition") or transition_evidence(
             current_role_id, role_id, G
         )
@@ -423,6 +465,16 @@ def rank_roles_by_gap(
     def _key(candidate: dict) -> tuple:
         accessibility = candidate["skill_gap"]["accessibility"]
         transition = candidate.get("transition") or {}
+        evidence_type = transition.get("evidence_type", "")
+        transition_bucket = {
+            "direct_transition": 0,
+            "semantic_transition_backoff": 1,
+        }.get(evidence_type, 2)
+        transition_strength = (
+            float(transition.get("probability", transition.get("score", 0.0)))
+            if transition_bucket < 2
+            else 0.0
+        )
         title = G.nodes[candidate["id"]].get("title", "") if G.has_node(candidate["id"]) else ""
         if any_accessibility:
             evidence_bucket = 0 if accessibility is not None else 1
@@ -433,7 +485,8 @@ def rank_roles_by_gap(
         return (
             evidence_bucket,
             accessibility_key,
-            -float(transition.get("probability", transition.get("score", 0.0))),
+            transition_bucket,
+            -transition_strength,
             -int(transition.get("count", 0)),
             -candidate["semantic_score"],
             normalize_label(title),

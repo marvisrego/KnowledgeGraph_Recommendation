@@ -27,6 +27,7 @@ import networkx as nx
 import numpy as np
 
 from src.kg_enrichment import role_skills, skill_degree
+from src.transition_policy import is_training_transition
 
 if TYPE_CHECKING:
     pass
@@ -137,7 +138,7 @@ def build_transition_index(G: nx.MultiDiGraph) -> dict[str, dict[str, float]]:
     """Build {source_id: {target_id: probability}} from train TRANSITIONS_TO edges."""
     index: dict[str, dict[str, float]] = {}
     for src, tgt, data in G.edges(data=True):
-        if data.get("relation") != "TRANSITIONS_TO" or data.get("source") != "karrierewege":
+        if not is_training_transition(data):
             continue
         src_str = str(src)
         tgt_str = str(tgt)

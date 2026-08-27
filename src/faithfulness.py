@@ -56,13 +56,65 @@ def extract_entities(text: str) -> list[str]:
     entities: list[str] = []
     seen: set[str] = set()
 
-    bold_pattern = re.compile(r"\*\*([^*]+)\*\*")
-    for match in bold_pattern.finditer(text):
-        phrase = match.group(1).strip()
+    def _add(phrase: str) -> None:
+        phrase = phrase.strip(" \t\r\n.,;:!?()[]{}\"'“”‘’")
+        phrase = re.sub(
+            r"^(?:your|my|their|our|the|a|an)\s+",
+            "",
+            phrase,
+            flags=re.IGNORECASE,
+        )
+        slash_parts = [part.strip() for part in phrase.split("/")]
+        if (
+            len(slash_parts) > 1
+            and all(re.fullmatch(r"[A-Za-z][A-Za-z0-9+#.-]*", part) for part in slash_parts)
+            and not all(part.isupper() for part in slash_parts)
+        ):
+            for part in slash_parts:
+                _add(part)
+            return
         normalized = normalize_label(phrase)
+        if normalized in {"a", "an", "the", "your", "my", "their", "our"}:
+            return
         if normalized and normalized not in seen and len(normalized) > 2:
             entities.append(phrase)
             seen.add(normalized)
+
+    bold_pattern = re.compile(r"\*\*([^*]+)\*\*")
+    for match in bold_pattern.finditer(text):
+        _add(match.group(1))
+
+    # Quoted role/skill candidates.
+    for match in re.finditer(r"[\"“]([^\"”]{3,80})[\"”]", text):
+        _add(match.group(1))
+
+    # Capitalized multi-word entities and in-sentence technology names such as
+    # Python. Sentence-opening prose words are intentionally ignored.
+    capitalized = re.compile(
+        r"\b[A-Z][A-Za-z0-9+#./-]*(?:\s+[A-Z][A-Za-z0-9+#./-]*){0,4}\b"
+    )
+    for match in capitalized.finditer(text):
+        phrase = match.group(0)
+        is_multiword = " " in phrase
+        is_technical_token = phrase.isupper() or bool(re.search(r"[0-9+#./-]", phrase))
+        before = text[: match.start()].rstrip()
+        is_sentence_start = not before or before[-1:] in ".!?\n"
+        if is_multiword or is_technical_token or not is_sentence_start:
+            _add(phrase)
+
+    # Lower-case candidates explicitly introduced as skills or development
+    # targets. Stop at punctuation or a coordinating conjunction.
+    cue_pattern = re.compile(
+        r"\b(?:skill(?:s)?\s+(?:such\s+as|like|including)|"
+        r"learn|develop|using|use|know|knowledge\s+of|experience\s+with|proficient\s+in)"
+        r"\s+([A-Za-z][A-Za-z0-9+#./-]*(?:\s+[A-Za-z][A-Za-z0-9+#./-]*){0,3})",
+        re.IGNORECASE,
+    )
+    for match in cue_pattern.finditer(text):
+        phrase = re.split(r"\s+(?:and|but|because|while|to)\s+", match.group(1), maxsplit=1)[0]
+        phrase = re.sub(r"^(?:your|my|their|the|a|an)\s+", "", phrase, flags=re.IGNORECASE)
+        phrase = re.sub(r"\s+(?:skills?|knowledge|experience)$", "", phrase, flags=re.IGNORECASE)
+        _add(phrase)
 
     return entities
 
@@ -78,6 +130,10 @@ def build_entity_index(G: nx.MultiDiGraph) -> dict[str, str]:
         normalized = normalize_label(title)
         if normalized:
             index[normalized] = str(nid)
+        short_title = re.sub(r"\s*\([^)]*\)\s*$", "", title).strip()
+        short_normalized = normalize_label(short_title)
+        if short_normalized:
+            index.setdefault(short_normalized, str(nid))
     return index
 
 

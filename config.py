@@ -137,7 +137,7 @@ class Settings:
             retrieval_top_k=int(os.getenv("RETRIEVAL_TOP_K", "50")),
             rerank_top_n=int(os.getenv("RERANK_TOP_N", "8")),
             onet_importance_threshold=float(
-                os.getenv("ONET_IMPORTANCE_THRESHOLD", "3.0")
+                os.getenv("ONET_IMPORTANCE_THRESHOLD", "3.5")
             ),
             transition_min_count=int(os.getenv("TRANSITION_MIN_COUNT", "5")),
             transition_chunk_size=int(os.getenv("TRANSITION_CHUNK_SIZE", "200000")),
@@ -162,7 +162,7 @@ class Settings:
             effort_weight_empirical=float(os.getenv("EFFORT_WEIGHT_EMPIRICAL", "0.25")),
             effort_weight_transferability=float(os.getenv("EFFORT_WEIGHT_TRANSFERABILITY", "0.25")),
             # Link prediction
-            link_prediction_enabled=_bool("LINK_PREDICTION_ENABLED", False),
+            link_prediction_enabled=_bool("LINK_PREDICTION_ENABLED", True),
             link_prediction_model_path=_path("LINK_PREDICTION_MODEL_PATH", "artifacts/link_prediction/link_predictor.pkl"),
             # Agent orchestration
             use_langgraph=_bool("USE_LANGGRAPH", False),

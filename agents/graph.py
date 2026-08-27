@@ -31,6 +31,11 @@ def _route_after_intent(state: CareerAgentState) -> str:
     return "retrieval_partial"
 
 
+def _route_after_traversal(state: CareerAgentState) -> str:
+    """Stop partial-context requests before effort and LLM generation."""
+    return "effort" if state.get("has_context", True) else "explore"
+
+
 def _build_explore(state: CareerAgentState, *, G, **kwargs) -> dict[str, Any]:
     """Build explore data for partial-context responses."""
     from src.inference_pipeline import _build_explore_data
@@ -53,6 +58,7 @@ def build_career_graph(
     G,
     collection,
     transition_smoother=None,
+    link_prediction_runtime=None,
 ) -> StateGraph:
     """Construct the LangGraph workflow with injected dependencies.
 
@@ -60,7 +66,14 @@ def build_career_graph(
     """
     # Bind dependencies to node functions via partial
     intent = partial(intent_node, settings=settings, G=G)
-    retrieval = partial(retrieval_node, settings=settings, G=G, collection=collection, transition_smoother=transition_smoother)
+    retrieval = partial(
+        retrieval_node,
+        settings=settings,
+        G=G,
+        collection=collection,
+        transition_smoother=transition_smoother,
+        link_prediction_runtime=link_prediction_runtime,
+    )
     ranking = partial(ranking_node, settings=settings, G=G)
     traversal = partial(traversal_node, settings=settings, G=G)
     effort = partial(effort_node, settings=settings, G=G, transition_smoother=transition_smoother)
@@ -98,7 +111,10 @@ def build_career_graph(
     # Full context path
     workflow.add_edge("retrieval", "ranking")
     workflow.add_edge("ranking", "traversal")
-    workflow.add_edge("traversal", "effort")
+    workflow.add_conditional_edges("traversal", _route_after_traversal, {
+        "effort": "effort",
+        "explore": "explore",
+    })
     workflow.add_edge("effort", "generation")
     workflow.add_edge("generation", "faithfulness")
     workflow.add_edge("faithfulness", "explanation")
@@ -107,15 +123,7 @@ def build_career_graph(
 
     # Partial context path
     workflow.add_edge("retrieval_partial", "ranking")
-    # After ranking in partial mode, build explore and end
-    # We reuse ranking → traversal → explore → END
-    # Actually for partial, after ranking we need traversal for explore data too
-    # Let's route: retrieval_partial → ranking → traversal, then check context
-    # Simpler: just use the same path but skip generation
-
-    # Override: for partial, after traversal go to explore instead of effort
-    # This requires a more complex routing. Let's simplify:
-    # Partial path reuses the same retrieval+ranking+traversal, but then goes to explore→END
+    workflow.add_edge("explore", END)
 
     return workflow.compile()
 
@@ -127,6 +135,7 @@ def run_career_workflow(
     G,
     collection,
     transition_smoother=None,
+    link_prediction_runtime=None,
 ) -> dict:
     """Execute the full career advisor workflow and return the response dict.
 
@@ -135,7 +144,13 @@ def run_career_workflow(
     import time
 
     t0 = time.time()
-    app = build_career_graph(settings, G, collection, transition_smoother)
+    app = build_career_graph(
+        settings,
+        G,
+        collection,
+        transition_smoother,
+        link_prediction_runtime,
+    )
 
     initial_state: CareerAgentState = {
         "query": query,

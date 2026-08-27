@@ -35,21 +35,21 @@ Structured Career Recommendation
 
 - **Knowledge Graph**: 19,225 nodes, 224,711 edges spanning ONET + ESCO taxonomies with 18,907 empirical career transition edges
 - **Transition Effort Score**: Multi-factor difficulty metric (IDF-weighted skill gap, ISCO domain distance, empirical support, transferability)
-- **Link Prediction**: LightGBM with 9 graph-structural features (CV AUC 0.9344) achieving 100% source-role coverage
+- **Link Prediction**: LightGBM with 9 graph-structural features (CV AUC 0.9344) exposed as clearly labeled, virtual missing-edge backfill
 - **Faithfulness Verification**: Post-generation check that LLM-cited entities exist in the graph and are reachable from anchor nodes
 - **Explanation Chains**: Typed-edge evidence paths (TRANSITIONS_TO, SIMILAR_TO, REQUIRES) for each recommendation
-- **Hybrid Retrieval**: Vector search + empirical transitions + link prediction with priority-based fallback
-- **Embedding-Smoothed Transitions**: Semantic-neighbour propagation for cold-start roles (+8.2% coverage)
+- **Hybrid Retrieval**: Vector search + accepted transition smoothing + role-relevant graph overlap, with LP coverage backfill
+- **Embedding-Smoothed Transitions**: Semantic-neighbour propagation for cold-start roles (+26.1 percentage points source-role coverage)
 
 ## Inference Pipeline
 
 | Step | Component | Method |
 |------|-----------|--------|
 | 1 | Intent Routing | LLM classifies user type, extracts skills/role/goal |
-| 2 | Retrieval | ChromaDB cosine (top-50) + transition augmentation |
+| 2 | Retrieval | RRF over Chroma, direct/smoothed transitions, and IDF skill overlap; LP missing-edge backfill |
 | 3 | Reranking | Cohere rerank-v4.0-pro → top-8 candidates |
-| 4 | Skill-Gap Ranking | Deterministic accessibility ordering (owned ∩ required / required) |
-| 5 | Graph Traversal | REQUIRES, SIMILAR_TO, TRANSITIONS_TO triples |
+| 4 | Skill-Gap Ranking | IDF-weighted role-relevant accessibility ordering |
+| 5 | Graph Traversal | REQUIRES, SIMILAR_TO, observed and explicitly inferred transition triples |
 | 6 | Effort Scoring | TES = 0.35×SkillGap + 0.15×Domain + 0.25×(1-Empirical) + 0.25×(1-Transfer) |
 | 7 | Generation | LLM grounded in graph triples (2-3 sentences) |
 | 8 | Faithfulness | Entity extraction → graph match → BFS reachability |
@@ -61,14 +61,14 @@ Structured Career Recommendation
 | Method | Hits@5 | Hits@10 | MRR | Coverage |
 |--------|--------|---------|-----|----------|
 | Direct edges (baseline) | 0.3702 | 0.5014 | 0.2591 | 73.9% |
-| + Embedding smoothing | 0.3722 | 0.5058 | 0.2617 | 95.3% |
-| + Combined (direct > LP) | 0.3704 | 0.5017 | 0.2580 | **100%** |
+| Accepted embedding smoothing | 0.3722 | 0.5058 | 0.2617 | **100%** |
+| Combined priority fallback | 0.3722 | 0.5058 | 0.2617 | **100%** |
 
 | Model | Metric | Value |
 |-------|--------|-------|
 | Link Prediction | 5-fold CV AUC | 0.9344 |
 | Link Prediction | 5-fold CV AP | 0.8186 |
-| Faithfulness | Live test score | 1.0 (7/7 reachable) |
+| Link Prediction | Standalone test Hits@5 | 0.0274 (coverage-only; not promoted as a top-K ranker) |
 
 ## Technology Stack
 
@@ -102,7 +102,7 @@ Structured Career Recommendation
 
 4. Open http://127.0.0.1:8001
 
-Local development reads the graph from `graph/graph.gpickle` and the Chroma index from `index/chroma/`. These are excluded from Git and must be hosted externally for deployment.
+Local development reads the graph from `graph/graph.gpickle`, the Chroma index from `index/chroma/`, and the LP model from `artifacts/link_prediction/link_predictor.pkl`. These are excluded from Git and must be hosted externally for deployment.
 
 ## Deploy to Vercel
 
@@ -115,10 +115,10 @@ Connect this repository and deploy the `dev` branch. Vercel detects `app.py` as 
 
 **Optional (see `.env.example` for full list):**
 - `USE_LANGGRAPH=true` — enable agent orchestration
-- `LINK_PREDICTION_ENABLED=true` — enable LP fallback for uncovered roles
+- `LINK_PREDICTION_ENABLED=true` — enabled by default; disable the virtual LP backfill if desired
 - `EFFORT_WEIGHT_*` — tune effort score component weights
 
-The deployment does not ship graph or vector data. Connect `load_graph()` and `load_chroma_collection()` to external hosted databases.
+The deployment does not ship graph, vector, or trained-model data. Connect the loaders to external hosted storage before treating production endpoints as ready.
 
 ## Project Structure
 

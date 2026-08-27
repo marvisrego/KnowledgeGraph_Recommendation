@@ -31,6 +31,12 @@ const ICONS = {
         ["circle", {cx: "12", cy: "18", r: "2.5"}],
         ["path", {d: "M6 8.5v2A7.5 7.5 0 0 0 12 18M18 8.5v2A7.5 7.5 0 0 1 12 18"}]
     ],
+    graph: [
+        ["circle", {cx: "5", cy: "6", r: "2.5"}],
+        ["circle", {cx: "19", cy: "6", r: "2.5"}],
+        ["circle", {cx: "12", cy: "18", r: "2.5"}],
+        ["path", {d: "M7.5 7.5 10.5 16M16.5 7.5 13.5 16M7.5 6h9"}]
+    ],
     star: [
         ["path", {d: "m12 2 3.1 6.3 6.9 1-5 4.8 1.2 6.9-6.2-3.2L5.8 21 7 14.1 2 9.3l6.9-1Z"}]
     ],
@@ -566,6 +572,11 @@ function addCareerPath(path) {
                 transition.classList.add("is-inferred");
                 transition.textContent = "Semantic transition evidence · " + support + " related roles";
                 transition.title = "Inferred from training transitions of semantically related ESCO roles; not a directly observed move";
+            } else if (role.transition.evidence_type === "predicted_transition") {
+                const score = (Number(role.transition.score || 0) * 100).toFixed(1);
+                transition.classList.add("is-inferred");
+                transition.textContent = "Predicted transition · " + score + "% model score";
+                transition.title = "A model-predicted missing edge; not an observed population transition";
             } else {
                 const count = Number(role.transition.count || 0).toLocaleString();
                 const probability = (Number(role.transition.probability || 0) * 100).toFixed(1);
@@ -621,9 +632,9 @@ function renderAssistantPayload(payload) {
 
 function addExplanationChains(explanations) {
     const article = document.createElement("article");
-    article.className = "chat-bubble assistant";
+    article.className = "message message-assistant message-evidence";
     const panel = document.createElement("div");
-    panel.className = "explanation-panel";
+    panel.className = "evidence-panel explanation-panel";
     const header = createPanelHeader("graph", "Why these roles?", "");
     panel.appendChild(header);
 
@@ -649,6 +660,10 @@ function addExplanationChains(explanations) {
                 text = "→ TRANSITIONS_TO (" + pct + "%, n=" + (attrs.count || 0) + ") → " + target;
             } else if (relation === "SIMILAR_TO") {
                 text = "→ SIMILAR_TO (" + (attrs.similarity || 0).toFixed(2) + ") → " + target;
+            } else if (relation === "PREDICTED_TRANSITION") {
+                text = "→ PREDICTED_TRANSITION (model score " + ((attrs.score || 0) * 100).toFixed(1) + "%) → " + target;
+            } else if (relation === "SEMANTIC_TRANSITION_BACKOFF") {
+                text = "→ SEMANTIC_TRANSITION_BACKOFF (" + (attrs.neighbour_support || 0) + " related roles) → " + target;
             } else if (relation === "REQUIRES") {
                 const marker = (attrs.status || "").includes("have") ? "(you have this)" : "(you need this)";
                 line.classList.add(attrs.transferable ? "step-have" : "step-need");
