@@ -38,8 +38,8 @@
         </div>
     </header>
 
-    <main class="graph-workspace" id="graph-canvas">
-        <div id="cy" aria-label="Interactive career knowledge graph"></div>
+    <main class="graph-workspace" id="graph-canvas" tabindex="-1">
+        <div id="cy" aria-hidden="true"></div>
         <section class="graph-state" id="graph-state" aria-live="polite">
             <div class="spinner" aria-hidden="true"></div>
             <p class="state-title" id="state-title">Mapping the career network</p>
@@ -56,6 +56,12 @@
             <button class="control-button" id="btn-zoom-out" type="button" aria-label="Zoom out" title="Zoom out">
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M5 12h14" /></svg>
             </button>
+        </div>
+        <div class="node-browser">
+            <label for="node-select">Inspect a graph node</label>
+            <select id="node-select">
+                <option value="">Choose a role or skill</option>
+            </select>
         </div>
         <aside class="node-inspector" id="node-inspector" aria-live="polite" hidden>
             <button class="inspector-close" id="inspector-close" type="button" aria-label="Close node details">

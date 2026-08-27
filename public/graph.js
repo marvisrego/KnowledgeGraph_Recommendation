@@ -10,6 +10,7 @@ const ui = {
     tooltip: document.getElementById("node-tooltip"), tooltipTitle: document.getElementById("tooltip-title"),
     tooltipType: document.getElementById("tooltip-type"), fit: document.getElementById("btn-fit"),
     zoomIn: document.getElementById("btn-zoom-in"), zoomOut: document.getElementById("btn-zoom-out"),
+    nodeSelect: document.getElementById("node-select"),
 };
 
 let graph = null;
@@ -32,6 +33,7 @@ function clearSelection() {
     ui.inspector.hidden = true;
     ui.workspace.classList.remove("inspector-open");
     ui.tooltip.hidden = true;
+    ui.nodeSelect.value = "";
     if (graph) graph.elements().removeClass("dimmed highlighted show-label");
 }
 
@@ -59,6 +61,16 @@ function inspectNode(node) {
     addFact("Connections", node.degree());
     ui.inspector.hidden = false;
     ui.workspace.classList.add("inspector-open");
+    ui.nodeSelect.value = node.id();
+}
+
+function selectNode(node) {
+    if (!node || node.empty()) return;
+    const neighbourhood = node.closedNeighborhood();
+    graph.elements().removeClass("dimmed highlighted show-label").addClass("dimmed");
+    neighbourhood.removeClass("dimmed").addClass("highlighted");
+    node.addClass("show-label");
+    inspectNode(node);
 }
 
 function positionTooltip(event) {
@@ -73,12 +85,7 @@ function positionTooltip(event) {
 
 function bindInteractions(instance) {
     instance.on("tap", "node", function (event) {
-        const selected = event.target;
-        const neighbourhood = selected.closedNeighborhood();
-        instance.elements().removeClass("dimmed highlighted show-label").addClass("dimmed");
-        neighbourhood.removeClass("dimmed").addClass("highlighted");
-        selected.addClass("show-label");
-        inspectNode(selected);
+        selectNode(event.target);
     });
     instance.on("tap", function (event) { if (event.target === instance) clearSelection(); });
     instance.on("zoom", function () {
@@ -124,7 +131,14 @@ function createGraph(data) {
         wheelSensitivity: .26, minZoom: .12, maxZoom: 4,
     });
     graph.nodes().filter(function (node) { return node.degree() === 0; }).addClass("orphan");
-    ui.canvas.setAttribute("tabindex", "0");
+    const options = graph.nodes().map(function (node) {
+        const data = node.data();
+        return {id: node.id(), label: data.label || node.id(), type: data.type || "node"};
+    }).sort(function (a, b) { return a.label.localeCompare(b.label); });
+    ui.nodeSelect.replaceChildren(new Option("Choose a role or skill", ""));
+    options.forEach(function (item) {
+        ui.nodeSelect.add(new Option(item.label + " · " + item.type, item.id));
+    });
     bindInteractions(graph);
 }
 
@@ -138,11 +152,13 @@ async function loadGraph() {
         showState("Graph renderer unavailable", "The graph library could not be loaded. Check your connection, then try again.", true);
         return;
     }
-    loadController = new AbortController();
+    const controller = new AbortController();
+    loadController = controller;
     try {
-        const response = await fetch("/api/graph-data", { signal: loadController.signal });
+        const response = await fetch("/api/graph-data", { signal: controller.signal });
         if (!response.ok) throw new Error("The server returned " + response.status + ".");
         const data = await response.json();
+        if (loadController !== controller) return;
         if (!data || !Array.isArray(data.nodes) || !Array.isArray(data.edges) || !data.nodes.length) throw new Error("No graph sample was returned.");
         const stats = data.stats || {};
         ui.stats.textContent = "Showing " + count(stats.shown_nodes || data.nodes.length) + " nodes · " + count(stats.shown_edges || data.edges.length) +
@@ -151,10 +167,11 @@ async function loadGraph() {
         ui.state.hidden = true;
     } catch (error) {
         if (error && error.name === "AbortError") return;
+        if (loadController !== controller) return;
         showState("Unable to load the graph", error && error.message ? error.message : "An unexpected error occurred.", true);
         ui.stats.textContent = "Graph data unavailable";
     } finally {
-        loadController = null;
+        if (loadController === controller) loadController = null;
     }
 }
 
@@ -162,5 +179,12 @@ ui.fit.addEventListener("click", function () { if (graph) graph.fit(undefined, 4
 ui.zoomIn.addEventListener("click", function () { if (graph) graph.zoom({ level: graph.zoom() * 1.25, renderedPosition: { x: graph.width() / 2, y: graph.height() / 2 } }); });
 ui.zoomOut.addEventListener("click", function () { if (graph) graph.zoom({ level: graph.zoom() * .8, renderedPosition: { x: graph.width() / 2, y: graph.height() / 2 } }); });
 ui.inspectorClose.addEventListener("click", clearSelection);
+ui.nodeSelect.addEventListener("change", function () {
+    if (!graph || !ui.nodeSelect.value) {
+        clearSelection();
+        return;
+    }
+    selectNode(graph.$id(ui.nodeSelect.value));
+});
 ui.retry.addEventListener("click", loadGraph);
 loadGraph();

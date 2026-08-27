@@ -17,6 +17,7 @@ from src.skill_gap import (
     transition_destinations,
     transition_evidence,
 )
+from src.transition_policy import is_training_transition
 from src.transition_effort import (
     EffortWeights,
     get_idf_map,
@@ -74,7 +75,7 @@ def find_related_roles(role_phrase: str, G: nx.MultiDiGraph, limit: int = 10) ->
     related = []
     for _, target, data in G.out_edges(role_id, data=True):
         rel = data.get("relation", "")
-        if rel in ("SIMILAR_TO", "TRANSITIONS_TO"):
+        if rel == "SIMILAR_TO" or (rel == "TRANSITIONS_TO" and is_training_transition(data)):
             if G.has_node(target):
                 related.append({
                     "id": str(target),

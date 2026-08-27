@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING, Any
 
 import networkx as nx
 
+from src.transition_policy import is_training_transition
+
 if TYPE_CHECKING:
     from config import Settings
 
@@ -177,6 +179,7 @@ def retrieve_candidates(
     query: str,
     collection,
     settings: "Settings",
+    limit: int | None = None,
 ) -> list[dict]:
     """Embed the query and retrieve top-K role candidates from ChromaDB."""
     from src.embeddings_index import embed_texts
@@ -191,7 +194,7 @@ def retrieve_candidates(
     try:
         results = collection.query(
             query_embeddings=[query_vector],
-            n_results=settings.retrieval_top_k,
+            n_results=limit or settings.retrieval_top_k,
             include=["metadatas", "documents", "distances"],
         )
     except Exception as exc:
@@ -355,7 +358,7 @@ def rerank_candidates(
 def traverse_graph(
     anchor_ids: list[str],
     G: nx.MultiDiGraph,
-    onet_importance_threshold: float = 3.0,
+    onet_importance_threshold: float = 3.5,
     transition_limit: int = 8,
 ) -> list[tuple]:
     """Collect graph triples for each anchor node.
@@ -399,7 +402,7 @@ def traverse_graph(
             elif rel in ("BELONGS_TO", "BROADER_THAN", "NARROWER_THAN", "SIMILAR_TO"):
                 _add(node_id, rel, dst, dict(edge_data))
 
-            elif rel == "TRANSITIONS_TO" and edge_data.get("source") == "karrierewege":
+            elif is_training_transition(edge_data):
                 transition_edges.append((str(dst), dict(edge_data)))
 
         transition_edges.sort(
@@ -476,6 +479,9 @@ def _build_context_block(
         if rel == "SEMANTIC_TRANSITION_BACKOFF":
             extra.append(f"inferred_score={float(attrs.get('score', 0.0)):.4f}")
             extra.append(f"related_source_roles={int(attrs.get('neighbour_support', 0))}")
+        if rel == "PREDICTED_TRANSITION":
+            extra.append(f"predicted_score={float(attrs.get('score', 0.0)):.4f}")
+            extra.append(f"model={attrs.get('model', 'unknown')}")
         extra_str = f" [{', '.join(extra)}]" if extra else ""
         lines.append(f"  ({src_title}) --[{rel}]--> ({dst_title}){extra_str}")
 
@@ -484,17 +490,25 @@ def _build_context_block(
 
 _GENERATION_SYSTEM_PROMPT_STUDENT = """
 You are a university careers advisor. Respond in exactly 1 short paragraph — 2 to 3 sentences only.
-Address the student directly, name their best-fit role in **bold**, and briefly mention one key skill they already have and one to develop.
+Address the student directly, name their best-fit role in **bold**, and briefly mention one key skill they already have and one to develop. Bold every role and skill you name.
+Call something a strength or existing skill only when the user explicitly states they have it; a role requirement alone is not evidence of ownership.
+Prioritize occupation-specific skill gaps. Mention general language or comprehension abilities as the main gap only when they are central to the destination role or no stronger graph-supported gap exists.
 No headings, no bullet lists. Every role and skill you name MUST appear in the provided graph data.
+Use exact graph labels; do not introduce abbreviations, combined labels, or umbrella terms that are absent from the graph.
 Empirical transitions are population-level observations, not guarantees about an individual.
+Predicted or semantic transition evidence is inferred and must never be described as a directly observed move.
 """.strip()
 
 _GENERATION_SYSTEM_PROMPT_PROFESSIONAL = """
 You are a senior career coach. Respond in exactly 1 short paragraph — 2 to 3 sentences only.
-Address the professional directly, name their best-fit next role in **bold**, and briefly mention one strength they have and one skill gap to bridge.
+Address the professional directly, name their best-fit next role in **bold**, and briefly mention one strength they have and one skill gap to bridge. Bold every role and skill you name.
+Call something a strength or existing skill only when the user explicitly states they have it; a role requirement alone is not evidence of ownership.
+Prioritize occupation-specific skill gaps. Mention general language or comprehension abilities as the main gap only when they are central to the destination role or no stronger graph-supported gap exists.
 No headings, no bullet lists. Every role and skill you name MUST appear in the provided graph data.
+Use exact graph labels; do not introduce abbreviations, combined labels, or umbrella terms that are absent from the graph.
 Treat empirical transitions as population-level evidence, never as a guaranteed outcome.
 SEMANTIC_TRANSITION_BACKOFF is inferred from training transitions of semantically related source roles; never describe it as a directly observed move.
+PREDICTED_TRANSITION is model-inferred missing-edge evidence; never describe it as observed population evidence.
 """.strip()
 
 
@@ -685,6 +699,7 @@ def _build_path_data(
             "need": _display_items(skill_gap.get("need", [])),
             "transition": candidate.get("transition"),
             "semantic_score": candidate.get("semantic_score"),
+            "retrieval_sources": candidate.get("retrieval_sources", []),
         })
         seen_role_ids.append(nid)
 
@@ -753,6 +768,7 @@ def run_query(
     settings: "Settings",
     history: list[dict] | None = None,
     transition_smoother=None,
+    link_prediction_runtime=None,
 ) -> dict:
     """Orchestrate the full GraphRAG inference loop.
 
@@ -819,31 +835,18 @@ def run_query(
         "excluded_non_owned_skills": skill_evidence.get("excluded", []),
     }
 
-    # 2. Retrieval (always run — even for partial context)
-    try:
-        candidates = retrieve_candidates(query, collection, settings)
-    except RuntimeError as exc:
-        if not intent.get("has_context", True):
-            msg = intent.get("followup_questions", "Could you tell me more about your background and goals?")
-            return {"message": msg, "courses": [], "path": {}, "explore": {}, "evidence": public_evidence}
-        return {"message": f"I was unable to search for matching roles: {exc}", "courses": [], "path": {}, "explore": {}, "evidence": public_evidence}
+    # 2. Hybrid retrieval (always run — even for partial context)
+    from src.hybrid_retrieval import hybrid_retrieve
 
-    candidates = filter_candidates_to_graph(candidates, G)
-    smoothed_destinations = []
-    if transition_smoother is not None and current_role_id:
-        try:
-            smoothed_destinations = transition_smoother.rank(
-                current_role_id,
-                settings.transition_candidate_limit,
-            )
-        except Exception as exc:
-            print(f"[inference_pipeline] Transition smoothing failed (using direct evidence): {exc}")
-    candidates = augment_candidates_with_transitions(
-        candidates,
+    candidates = hybrid_retrieve(
+        query,
+        collection,
+        skill_evidence["skill_ids"],
         current_role_id,
         G,
-        limit=settings.transition_candidate_limit,
-        smoothed_destinations=smoothed_destinations,
+        settings,
+        transition_smoother=transition_smoother,
+        link_prediction_runtime=link_prediction_runtime,
     )
 
     if not candidates:
@@ -854,26 +857,14 @@ def run_query(
         top_candidates = rerank_candidates(query, candidates, settings)
     except RuntimeError as exc:
         print(f"[inference_pipeline] Reranking failed (using top retrieval results): {exc}")
-        fallback = sorted(
-            candidates,
-            key=lambda candidate: (
-                -float(
-                    (candidate.get("transition") or {}).get(
-                        "probability",
-                        (candidate.get("transition") or {}).get("score", 0.0),
-                    )
-                ),
-                -float(candidate.get("score", 0.0)),
-                str(candidate.get("id", "")),
-            ),
-        )
-        top_candidates = fallback[: settings.rerank_top_n]
+        top_candidates = candidates[: settings.rerank_top_n]
 
     top_candidates = rank_roles_by_gap(
         skill_evidence["skill_ids"],
         top_candidates,
         G,
         current_role_id=current_role_id,
+        onet_importance_threshold=settings.onet_importance_threshold,
     )
 
     anchor_ids = [c["id"] for c in top_candidates]
@@ -896,11 +887,10 @@ def run_query(
             if not transition or not current_role_id:
                 continue
             evidence_type = transition.get("evidence_type", "direct_transition")
-            relation = (
-                "SEMANTIC_TRANSITION_BACKOFF"
-                if evidence_type == "semantic_transition_backoff"
-                else "TRANSITIONS_TO"
-            )
+            relation = {
+                "semantic_transition_backoff": "SEMANTIC_TRANSITION_BACKOFF",
+                "predicted_transition": "PREDICTED_TRANSITION",
+            }.get(evidence_type, "TRANSITIONS_TO")
             key = (current_role_id, candidate["id"])
             if relation == "TRANSITIONS_TO" and key in seen_transition_triples:
                 continue
@@ -914,6 +904,8 @@ def run_query(
                         "source": (
                             "embedding_smoothing"
                             if relation == "SEMANTIC_TRANSITION_BACKOFF"
+                            else "link_prediction"
+                            if relation == "PREDICTED_TRANSITION"
                             else "karrierewege"
                         ),
                         **transition,
@@ -969,6 +961,7 @@ def run_query(
                     current_role_id, target_id,
                     skill_evidence["skill_ids"], G, idf_map, weights,
                     transition_smoother,
+                    settings.onet_importance_threshold,
                 )
                 role_entry["effort_score"] = round(effort.score, 4)
                 role_entry["effort_band"] = effort.band

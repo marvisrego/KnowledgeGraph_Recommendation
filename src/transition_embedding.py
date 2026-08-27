@@ -16,10 +16,11 @@ import networkx as nx
 import numpy as np
 
 from src.text_normalization import normalize_label
-
-
-TRANSITION_RELATION = "TRANSITIONS_TO"
-TRANSITION_SOURCE = "karrierewege"
+from src.transition_policy import (
+    TRANSITION_RELATION,
+    TRANSITION_SOURCE,
+    is_training_transition,
+)
 
 
 @dataclass(frozen=True)
@@ -85,13 +86,10 @@ def transition_distributions(
 
     distributions: dict[str, dict[str, TransitionValue]] = {}
     for source, target, _, data in graph.edges(keys=True, data=True):
-        if (
-            data.get("relation") != TRANSITION_RELATION
-            or data.get("source") != TRANSITION_SOURCE
-        ):
+        if data.get("relation") != TRANSITION_RELATION or data.get("source") != TRANSITION_SOURCE:
             continue
-        if data.get("split") not in (None, "train"):
-            raise ValueError("Only training transition edges may be used for smoothing.")
+        if not is_training_transition(data):
+            continue
 
         source_id = str(source)
         target_id = str(target)

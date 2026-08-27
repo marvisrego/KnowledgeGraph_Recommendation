@@ -17,7 +17,9 @@ from typing import TYPE_CHECKING
 
 import networkx as nx
 
-from src.kg_enrichment import compute_skill_idf, role_skills
+from src.kg_enrichment import compute_skill_idf
+from src.skill_gap import role_requirements
+from src.transition_policy import is_training_transition
 
 if TYPE_CHECKING:
     from src.transition_embedding import RuntimeTransitionSmoother
@@ -148,8 +150,7 @@ def empirical_support(
     for _, target, data in G.out_edges(source_id, data=True):
         if (
             str(target) == str(target_id)
-            and data.get("relation") == "TRANSITIONS_TO"
-            and data.get("source") == "karrierewege"
+            and is_training_transition(data)
         ):
             prob = float(data.get("probability", 0.0))
             count = int(data.get("count", 0))
@@ -162,7 +163,7 @@ def empirical_support(
 
     if smoother is not None:
         try:
-            rankings = smoother.rank(source_id)
+            rankings = smoother.rank(source_id, 50)
             for dest in rankings:
                 if str(dest.role_id) == str(target_id):
                     return dest.score * 0.5
@@ -177,13 +178,18 @@ def transferability(
     target_id: str,
     G: nx.MultiDiGraph,
     idf_map: dict[str, float],
+    onet_importance_threshold: float = 3.5,
 ) -> float:
     """IDF-weighted fraction of target skills that the source role also requires.
 
     High transferability = many rare skills transfer from source to target.
     """
-    source_skills = role_skills(source_id, G)
-    target_skills = role_skills(target_id, G)
+    source_skills, _, _ = role_requirements(
+        source_id, G, onet_importance_threshold
+    )
+    target_skills, _, _ = role_requirements(
+        target_id, G, onet_importance_threshold
+    )
 
     if not target_skills:
         return 0.0
@@ -207,6 +213,7 @@ def transition_effort_score(
     idf_map: dict[str, float] | None = None,
     weights: EffortWeights | None = None,
     smoother: "RuntimeTransitionSmoother | None" = None,
+    onet_importance_threshold: float = 3.5,
 ) -> EffortResult:
     """Compute the full Transition Effort Score for a source→target pair.
 
@@ -224,12 +231,16 @@ def transition_effort_score(
     if weights is None:
         weights = EffortWeights()
 
-    target_required = role_skills(target_id, G)
+    target_required, _, _ = role_requirements(
+        target_id, G, onet_importance_threshold
+    )
 
     sgm = skill_gap_magnitude(owned_skills, target_required, idf_map)
     dd = domain_distance(source_id, target_id, G)
     es = empirical_support(source_id, target_id, G, smoother)
-    tf = transferability(source_id, target_id, G, idf_map)
+    tf = transferability(
+        source_id, target_id, G, idf_map, onet_importance_threshold
+    )
 
     score = (
         weights.skill_gap * sgm
@@ -259,6 +270,7 @@ def rank_roles_by_effort(
     idf_map: dict[str, float] | None = None,
     weights: EffortWeights | None = None,
     smoother: "RuntimeTransitionSmoother | None" = None,
+    onet_importance_threshold: float = 3.5,
 ) -> list[dict]:
     """Annotate candidates with TES and sort by effort (low effort first).
 
@@ -276,7 +288,14 @@ def rank_roles_by_effort(
 
         if source_id and G.has_node(source_id) and G.has_node(target_id):
             result = transition_effort_score(
-                source_id, target_id, owned_skills, G, idf_map, weights, smoother
+                source_id,
+                target_id,
+                owned_skills,
+                G,
+                idf_map,
+                weights,
+                smoother,
+                onet_importance_threshold,
             )
             enriched["effort"] = result.to_dict()
         else:

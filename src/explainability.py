@@ -18,7 +18,9 @@ from dataclasses import dataclass
 
 import networkx as nx
 
-from src.kg_enrichment import role_skills
+from src.transition_policy import is_training_transition
+
+from src.skill_gap import role_requirements
 
 
 @dataclass
@@ -61,14 +63,21 @@ def trace_recommendation_path(
     source_title = str(G.nodes[source_role_id].get("title", source_role_id))
     target_title = str(G.nodes[target_role_id].get("title", target_role_id))
 
-    # 1. Direct transition evidence
-    for _, tgt, data in G.out_edges(source_role_id, data=True):
-        if (
-            str(tgt) == str(target_role_id)
-            and data.get("relation") == "TRANSITIONS_TO"
-            and data.get("source") == "karrierewege"
-        ):
-            steps.append(ExplanationStep(
+    # 1. Strongest direct transition evidence
+    direct_edges = [
+        data
+        for _, tgt, data in G.out_edges(source_role_id, data=True)
+        if str(tgt) == str(target_role_id) and is_training_transition(data)
+    ]
+    if direct_edges:
+        data = max(
+            direct_edges,
+            key=lambda edge: (
+                float(edge.get("probability", 0.0)),
+                int(edge.get("count", 0)),
+            ),
+        )
+        steps.append(ExplanationStep(
                 relation="TRANSITIONS_TO",
                 source_id=source_role_id,
                 source_title=source_title,
@@ -79,31 +88,33 @@ def trace_recommendation_path(
                     "count": int(data.get("count", 0)),
                     "evidence": "direct_observation",
                 },
-            ))
-            break
+        ))
 
-    # 2. SIMILAR_TO edges involving target
-    for src, tgt, data in G.edges(data=True):
-        if data.get("relation") != "SIMILAR_TO":
-            continue
-        if str(src) == str(target_role_id) or str(tgt) == str(target_role_id):
-            other = str(tgt) if str(src) == str(target_role_id) else str(src)
-            other_title = str(G.nodes[other].get("title", other)) if G.has_node(other) else other
-            steps.append(ExplanationStep(
+    # 2. Strongest SIMILAR_TO edge involving target
+    alignments: list[tuple[float, str, dict]] = []
+    for _, other, data in G.out_edges(target_role_id, data=True):
+        if data.get("relation") == "SIMILAR_TO":
+            alignments.append((float(data.get("similarity", 0.0)), str(other), data))
+    for other, _, data in G.in_edges(target_role_id, data=True):
+        if data.get("relation") == "SIMILAR_TO":
+            alignments.append((float(data.get("similarity", 0.0)), str(other), data))
+    if alignments:
+        similarity, other, data = max(alignments, key=lambda item: (item[0], item[1]))
+        other_title = str(G.nodes[other].get("title", other)) if G.has_node(other) else other
+        steps.append(ExplanationStep(
                 relation="SIMILAR_TO",
                 source_id=target_role_id,
                 source_title=target_title,
                 target_id=other,
                 target_title=other_title,
                 attributes={
-                    "similarity": round(float(data.get("similarity", 0)), 4),
+                    "similarity": round(similarity, 4),
                 },
-            ))
-            break  # Only include the strongest alignment
+        ))
 
     # 3. Shared skills (transferable)
-    source_skills = role_skills(source_role_id, G)
-    target_skills = role_skills(target_role_id, G)
+    source_skills, _, _ = role_requirements(source_role_id, G)
+    target_skills, _, _ = role_requirements(target_role_id, G)
     shared = source_skills & target_skills & owned_skill_ids
 
     for skill_id in sorted(shared)[:3]:
@@ -156,6 +167,16 @@ def format_explanation(steps: list[ExplanationStep]) -> str:
             lines.append(
                 f"  -> SIMILAR_TO ({sim:.2f}) -> {step.target_title}"
             )
+        elif step.relation == "PREDICTED_TRANSITION":
+            score = attrs.get("score", 0)
+            lines.append(
+                f"  -> PREDICTED_TRANSITION (model score {score:.2%}) -> {step.target_title}"
+            )
+        elif step.relation == "SEMANTIC_TRANSITION_BACKOFF":
+            support = attrs.get("neighbour_support", 0)
+            lines.append(
+                f"  -> SEMANTIC_TRANSITION_BACKOFF ({support} related roles) -> {step.target_title}"
+            )
         elif step.relation == "REQUIRES":
             status = attrs.get("status", "")
             marker = "(you already have this)" if "have" in status else "(you need this)"
@@ -191,6 +212,25 @@ def explain_career_path(
         steps = trace_recommendation_path(
             source_role_id, target_id, owned_skill_ids, G
         )
+        transition = role_entry.get("transition") or {}
+        evidence_type = transition.get("evidence_type")
+        relation = {
+            "predicted_transition": "PREDICTED_TRANSITION",
+            "semantic_transition_backoff": "SEMANTIC_TRANSITION_BACKOFF",
+        }.get(evidence_type)
+        if relation and not any(step.relation == "TRANSITIONS_TO" for step in steps):
+            steps.insert(0, ExplanationStep(
+                relation=relation,
+                source_id=source_role_id,
+                source_title=str(G.nodes[source_role_id].get("title", source_role_id)),
+                target_id=target_id,
+                target_title=str(G.nodes[target_id].get("title", target_id)),
+                attributes={
+                    key: value
+                    for key, value in transition.items()
+                    if key in {"score", "neighbour_probability", "neighbour_support", "model"}
+                },
+            ))
 
         explanations.append({
             "role_id": target_id,

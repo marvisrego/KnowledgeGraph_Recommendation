@@ -25,21 +25,14 @@ def ranking_node(state: CareerAgentState, *, settings, G, **kwargs) -> dict[str,
     try:
         top_candidates = rerank_candidates(query, candidates, settings)
     except RuntimeError:
-        fallback = sorted(
-            candidates,
-            key=lambda c: (
-                -float((c.get("transition") or {}).get("probability", (c.get("transition") or {}).get("score", 0.0))),
-                -float(c.get("score", 0.0)),
-                str(c.get("id", "")),
-            ),
-        )
-        top_candidates = fallback[: settings.rerank_top_n]
+        top_candidates = candidates[: settings.rerank_top_n]
 
     top_candidates = rank_roles_by_gap(
         skill_evidence.get("skill_ids", set()),
         top_candidates,
         G,
         current_role_id=current_role_id,
+        onet_importance_threshold=settings.onet_importance_threshold,
     )
 
     anchor_ids = [c["id"] for c in top_candidates]

@@ -36,7 +36,14 @@ def effort_node(state: CareerAgentState, *, settings, G, transition_smoother=Non
                 continue
             try:
                 effort = transition_effort_score(
-                    current_role_id, target_id, owned_skill_ids, G, idf_map, weights, transition_smoother,
+                    current_role_id,
+                    target_id,
+                    owned_skill_ids,
+                    G,
+                    idf_map,
+                    weights,
+                    transition_smoother,
+                    settings.onet_importance_threshold,
                 )
                 role_entry["effort_score"] = round(effort.score, 4)
                 role_entry["effort_band"] = effort.band
