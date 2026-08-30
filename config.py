@@ -165,5 +165,5 @@ class Settings:
             link_prediction_enabled=_bool("LINK_PREDICTION_ENABLED", True),
             link_prediction_model_path=_path("LINK_PREDICTION_MODEL_PATH", "artifacts/link_prediction/link_predictor.pkl"),
             # Agent orchestration
-            use_langgraph=_bool("USE_LANGGRAPH", False),
+            use_langgraph=_bool("USE_LANGGRAPH", True),
         )

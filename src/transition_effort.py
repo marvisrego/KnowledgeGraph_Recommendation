@@ -47,11 +47,15 @@ class EffortResult:
     empirical_support: float
     transferability: float
     weights: EffortWeights
+    estimated_weeks_min: int = 0
+    estimated_weeks_max: int = 0
 
     def to_dict(self) -> dict:
         return {
             "effort_score": round(self.score, 4),
             "effort_band": self.band,
+            "estimated_weeks_min": self.estimated_weeks_min,
+            "estimated_weeks_max": self.estimated_weeks_max,
             "components": {
                 "skill_gap_magnitude": round(self.skill_gap_magnitude, 4),
                 "domain_distance": round(self.domain_distance, 4),
@@ -59,6 +63,25 @@ class EffortResult:
                 "transferability": round(self.transferability, 4),
             },
         }
+
+
+_BAND_WEEKS: dict[str, tuple[int, int]] = {
+    "low": (4, 12),
+    "moderate": (12, 36),
+    "high": (36, 72),
+}
+
+
+def estimate_upskill_weeks(missing_count: int, band: str) -> tuple[int, int]:
+    """Estimate min/max weeks to upskill based on missing skill count.
+
+    Uses 5 weeks/skill midpoint with ±40% range. Falls back to band map when
+    missing_count is 0 (skill data absent).
+    """
+    if missing_count > 0:
+        raw = missing_count * 5
+        return (max(1, int(raw * 0.6)), max(4, int(raw * 1.4)))
+    return _BAND_WEEKS.get(band, (4, 12))
 
 
 def effort_band(score: float) -> str:
@@ -250,15 +273,21 @@ def transition_effort_score(
     )
 
     score = max(0.0, min(1.0, score))
+    band = effort_band(score)
+
+    missing_count = len(target_required - owned_skills) if target_required else 0
+    weeks_min, weeks_max = estimate_upskill_weeks(missing_count, band)
 
     return EffortResult(
         score=score,
-        band=effort_band(score),
+        band=band,
         skill_gap_magnitude=sgm,
         domain_distance=dd,
         empirical_support=es,
         transferability=tf,
         weights=weights,
+        estimated_weeks_min=weeks_min,
+        estimated_weeks_max=weeks_max,
     )
 
 

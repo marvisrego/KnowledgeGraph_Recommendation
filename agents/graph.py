@@ -16,8 +16,11 @@ from agents.state import CareerAgentState
 from agents.nodes.intent import intent_node
 from agents.nodes.retrieval import retrieval_node
 from agents.nodes.ranking import ranking_node
+from agents.nodes.qualification_node import qualification_node
 from agents.nodes.traversal import traversal_node
 from agents.nodes.effort import effort_node
+from agents.nodes.skill_gap_node import skill_gap_node
+from agents.nodes.learning_plan_node import learning_plan_node
 from agents.nodes.generation import generation_node
 from agents.nodes.courses import courses_node
 from agents.nodes.faithfulness_node import faithfulness_node
@@ -75,8 +78,11 @@ def build_career_graph(
         link_prediction_runtime=link_prediction_runtime,
     )
     ranking = partial(ranking_node, settings=settings, G=G)
+    qualification = partial(qualification_node, settings=settings, G=G)
     traversal = partial(traversal_node, settings=settings, G=G)
     effort = partial(effort_node, settings=settings, G=G, transition_smoother=transition_smoother)
+    skill_gap = partial(skill_gap_node, G=G, settings=settings)
+    learning_plan = partial(learning_plan_node, G=G)
     generation = partial(generation_node, settings=settings, G=G)
     courses = partial(courses_node, G=G)
     faithfulness = partial(faithfulness_node, G=G)
@@ -91,8 +97,11 @@ def build_career_graph(
     workflow.add_node("retrieval", retrieval)
     workflow.add_node("retrieval_partial", retrieval)
     workflow.add_node("ranking", ranking)
+    workflow.add_node("qualification", qualification)
     workflow.add_node("traversal", traversal)
     workflow.add_node("effort", effort)
+    workflow.add_node("skill_gap", skill_gap)
+    workflow.add_node("learning_plan", learning_plan)
     workflow.add_node("generation", generation)
     workflow.add_node("courses", courses)
     workflow.add_node("faithfulness", faithfulness)
@@ -110,16 +119,19 @@ def build_career_graph(
 
     # Full context path
     workflow.add_edge("retrieval", "ranking")
-    workflow.add_edge("ranking", "traversal")
+    workflow.add_edge("ranking", "qualification")
+    workflow.add_edge("qualification", "traversal")
     workflow.add_conditional_edges("traversal", _route_after_traversal, {
         "effort": "effort",
         "explore": "explore",
     })
-    workflow.add_edge("effort", "generation")
+    workflow.add_edge("effort", "skill_gap")
+    workflow.add_edge("skill_gap", "courses")
+    workflow.add_edge("courses", "learning_plan")
+    workflow.add_edge("learning_plan", "generation")
     workflow.add_edge("generation", "faithfulness")
     workflow.add_edge("faithfulness", "explanation")
-    workflow.add_edge("explanation", "courses")
-    workflow.add_edge("courses", END)
+    workflow.add_edge("explanation", END)
 
     # Partial context path
     workflow.add_edge("retrieval_partial", "ranking")
@@ -183,5 +195,7 @@ def run_career_workflow(
         "evidence": result.get("public_evidence", {}),
         "faithfulness": result.get("faithfulness"),
         "explanations": result.get("explanations", []),
+        "skill_gap_analysis": result.get("skill_gap_analysis", []),
+        "learning_plan": result.get("learning_plan", []),
         "metadata": {**result.get("metadata", {}), "total_ms": total_ms},
     }

@@ -22,7 +22,16 @@ def effort_node(state: CareerAgentState, *, settings, G, transition_smoother=Non
 
     path_data = _build_path_data(anchor_ids, triples, G, ranked_candidates=ranked_candidates)
 
-    if current_role_id and path_data.get("roles"):
+    roles = path_data.get("roles", [])
+    # Use explicit current role; fall back to first recommended role as synthetic source
+    # so students (who have no current_role_id) still get effort scores.
+    effective_source_id = current_role_id
+    effort_source_label = "from_current_role"
+    if not effective_source_id and len(roles) >= 2:
+        effective_source_id = roles[0]["id"]
+        effort_source_label = "relative"
+
+    if effective_source_id and roles:
         idf_map = get_idf_map(G)
         weights = EffortWeights(
             skill_gap=settings.effort_weight_skill_gap,
@@ -30,13 +39,13 @@ def effort_node(state: CareerAgentState, *, settings, G, transition_smoother=Non
             empirical=settings.effort_weight_empirical,
             transferability=settings.effort_weight_transferability,
         )
-        for role_entry in path_data["roles"]:
+        for role_entry in roles:
             target_id = role_entry["id"]
-            if target_id == current_role_id:
+            if target_id == effective_source_id:
                 continue
             try:
                 effort = transition_effort_score(
-                    current_role_id,
+                    effective_source_id,
                     target_id,
                     owned_skill_ids,
                     G,
@@ -47,8 +56,17 @@ def effort_node(state: CareerAgentState, *, settings, G, transition_smoother=Non
                 )
                 role_entry["effort_score"] = round(effort.score, 4)
                 role_entry["effort_band"] = effort.band
-            except Exception:
-                pass
+                role_entry["effort_source"] = effort_source_label
+                role_entry["estimated_weeks_min"] = effort.estimated_weeks_min
+                role_entry["estimated_weeks_max"] = effort.estimated_weeks_max
+            except Exception as exc:
+                print(f"[effort_node] Skipping effort for {target_id}: {exc}")
+
+    # Re-sort roles by effort ascending so the frontend shows easiest transitions first.
+    # Roles without a score (no source role matched) sort to the end.
+    path_data["roles"].sort(
+        key=lambda r: (r.get("effort_score") is None, r.get("effort_score", 999))
+    )
 
     return {
         "path_data": path_data,

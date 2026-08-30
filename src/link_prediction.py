@@ -39,10 +39,28 @@ FEATURE_NAMES = [
     "resource_allocation",
     "preferential_attachment",
     "embedding_cosine_sim",
-    "same_isco_group",
+    "isco_group_distance",     # replaces binary same_isco_group (0=same, 0.5=adjacent, 1=different)
     "idf_skill_overlap",
     "neighbour_evidence",
+    "title_tfidf_sim",         # TF-IDF cosine between role title strings
+    "meta_path_count",         # roles sharing ≥3 skills with both source and target
 ]
+
+
+def _isco_distance(src_isco: str, tgt_isco: str) -> float:
+    """ISCO structural distance: 0.0=same group, 0.5=adjacent, 1.0=different.
+
+    Uses numeric 2-digit ISCO codes. Returns 0.5 neutral when either is missing.
+    """
+    if not src_isco or not tgt_isco:
+        return 0.5
+    if src_isco == tgt_isco:
+        return 0.0
+    try:
+        diff = abs(int(src_isco) - int(tgt_isco))
+        return 0.5 if diff <= 5 else 1.0
+    except ValueError:
+        return 1.0
 
 
 def _get_idf(G: nx.MultiDiGraph) -> dict[str, float]:
@@ -108,10 +126,10 @@ def extract_pair_features(
             if norm_s > 0 and norm_t > 0:
                 cos_sim = dot / (norm_s * norm_t)
 
-    # 7. Same ISCO Group
+    # 7. ISCO Group Distance (replaces binary same_isco_group)
     source_isco = G.nodes.get(source_id, {}).get("isco_2digit", "")
     target_isco = G.nodes.get(target_id, {}).get("isco_2digit", "")
-    same_isco = 1.0 if (source_isco and target_isco and source_isco == target_isco) else 0.0
+    isco_dist = _isco_distance(source_isco, target_isco)
 
     # 8. IDF-weighted Skill Overlap
     if target_skills:
@@ -131,7 +149,13 @@ def extract_pair_features(
             if prob > ne:
                 ne = prob
 
-    return np.array([cn, jc, aa, ra, pa, cos_sim, same_isco, idf_overlap, ne], dtype=np.float64)
+    # 10. Title TF-IDF Similarity (0.0 at inference without precomputed matrix)
+    title_sim = 0.0
+
+    # 11. Meta-path Count (0.0 at inference without precomputed index)
+    meta_path = 0.0
+
+    return np.array([cn, jc, aa, ra, pa, cos_sim, isco_dist, idf_overlap, ne, title_sim, meta_path], dtype=np.float64)
 
 
 def build_transition_index(G: nx.MultiDiGraph) -> dict[str, dict[str, float]]:
@@ -223,8 +247,10 @@ def extract_pair_features_fast(
     neighbour_index: dict[str, list[str]] | None,
     source_isco: str,
     target_isco: str,
+    title_vectors: dict[str, np.ndarray] | None = None,
+    role_neighbours_3: dict[str, set[str]] | None = None,
 ) -> np.ndarray:
-    """Fast feature extraction using pre-computed caches."""
+    """Fast feature extraction using pre-computed caches (11 features)."""
     shared = source_skills & target_skills
     union = source_skills | target_skills
 
@@ -253,7 +279,8 @@ def extract_pair_features_fast(
             if norm_s > 0 and norm_t > 0:
                 cos_sim = dot / (norm_s * norm_t)
 
-    same_isco = 1.0 if (source_isco and target_isco and source_isco == target_isco) else 0.0
+    # 7. ISCO Group Distance
+    isco_dist = _isco_distance(source_isco, target_isco)
 
     if target_skills:
         shared_idf = sum(idf_map.get(s, 1.0) for s in shared)
@@ -271,7 +298,79 @@ def extract_pair_features_fast(
             if prob > ne:
                 ne = prob
 
-    return np.array([cn, jc, aa, ra, pa, cos_sim, same_isco, idf_overlap, ne], dtype=np.float64)
+    # 10. Title TF-IDF Similarity
+    title_sim = 0.0
+    if title_vectors is not None:
+        sv = title_vectors.get(source_id)
+        tv = title_vectors.get(target_id)
+        if sv is not None and tv is not None:
+            title_sim = float(np.dot(sv, tv))  # pre-normalised
+
+    # 11. Meta-path Count (log-normalised roles sharing ≥3 skills with both)
+    meta_path = 0.0
+    if role_neighbours_3 is not None:
+        src_nbrs = role_neighbours_3.get(source_id, set())
+        tgt_nbrs = role_neighbours_3.get(target_id, set())
+        common = src_nbrs & tgt_nbrs
+        meta_path = math.log2(1 + len(common))
+
+    return np.array([cn, jc, aa, ra, pa, cos_sim, isco_dist, idf_overlap, ne, title_sim, meta_path], dtype=np.float64)
+
+
+def precompute_title_vectors(G: nx.MultiDiGraph) -> dict[str, np.ndarray]:
+    """Build L2-normalised TF-IDF title vectors for all role nodes.
+
+    Uses unigram + bigram features over role titles. Returns {role_id: unit_vector}.
+    Falls back to empty dict if sklearn is unavailable.
+    """
+    try:
+        from sklearn.feature_extraction.text import TfidfVectorizer
+    except ImportError:
+        return {}
+
+    role_ids = []
+    titles = []
+    for nid, data in G.nodes(data=True):
+        if data.get("type") == "role":
+            role_ids.append(str(nid))
+            titles.append(str(data.get("title", "")))
+
+    if not role_ids:
+        return {}
+
+    vectorizer = TfidfVectorizer(ngram_range=(1, 2), min_df=1, max_features=8000, sublinear_tf=True)
+    matrix = vectorizer.fit_transform(titles)
+
+    # L2-normalise rows in-place (sparse → dense per row)
+    vectors: dict[str, np.ndarray] = {}
+    for i, rid in enumerate(role_ids):
+        vec = matrix[i].toarray().flatten().astype(np.float32)
+        norm = float(np.linalg.norm(vec))
+        if norm > 0:
+            vec /= norm
+        vectors[rid] = vec
+
+    return vectors
+
+
+def precompute_role_neighbours_3(
+    skills_cache: dict[str, set[str]],
+    role_ids: list[str],
+    min_shared: int = 3,
+) -> dict[str, set[str]]:
+    """For each role, find all roles sharing ≥ min_shared essential skills.
+
+    Used for meta-path count feature. O(roles²) — run once at training time.
+    """
+    result: dict[str, set[str]] = {rid: set() for rid in role_ids}
+    ids = [r for r in role_ids if r in skills_cache]
+    for i, src in enumerate(ids):
+        src_skills = skills_cache[src]
+        for tgt in ids[i + 1:]:
+            if len(src_skills & skills_cache[tgt]) >= min_shared:
+                result[src].add(tgt)
+                result[tgt].add(src)
+    return result
 
 
 def build_training_data(
@@ -303,7 +402,14 @@ def build_training_data(
     esco_set = set(esco_roles)
 
     source_roles = sorted(transition_index.keys())
-    neighbour_index = build_neighbour_index(G, embeddings or {}, source_roles)
+    neighbour_index = build_neighbour_index(G, embeddings or {}, source_roles, k=40)
+
+    # New: TF-IDF title vectors and meta-path precomputation
+    print("[link_prediction] Precomputing title TF-IDF vectors …")
+    title_vectors = precompute_title_vectors(G)
+    all_role_ids = [str(nid) for nid, d in G.nodes(data=True) if d.get("type") == "role"]
+    print("[link_prediction] Precomputing meta-path neighbour sets (≥3 shared skills) …")
+    role_neighbours_3 = precompute_role_neighbours_3(skills_cache, all_role_ids)
 
     positives: list[tuple[str, str]] = []
     for src, targets in transition_index.items():
@@ -312,21 +418,45 @@ def build_training_data(
                 positives.append((src, tgt))
 
     positive_set = set(positives)
-    negatives: list[tuple[str, str]] = []
     target_count = len(positives) * neg_ratio
 
+    # Hard negatives: semantic neighbours with no training transition (50% of negatives)
+    hard_target = target_count // 2
+    hard_negatives: list[tuple[str, str]] = []
+    hard_seen: set[tuple[str, str]] = set()
+    for src in source_roles:
+        neighbours = neighbour_index.get(src, [])
+        for nbr in neighbours:
+            pair = (src, nbr)
+            if nbr in esco_set and pair not in positive_set and pair not in hard_seen:
+                hard_negatives.append(pair)
+                hard_seen.add(pair)
+                if len(hard_negatives) >= hard_target:
+                    break
+        if len(hard_negatives) >= hard_target:
+            break
+
+    # Random negatives for the remaining 50%
+    random_target = target_count - len(hard_negatives)
+    random_negatives: list[tuple[str, str]] = []
+    seen_all = positive_set | hard_seen
     attempts = 0
-    max_attempts = target_count * 20
-    while len(negatives) < target_count and attempts < max_attempts:
+    max_attempts = random_target * 20
+    while len(random_negatives) < random_target and attempts < max_attempts:
         src = rng.choice(source_roles)
         tgt = rng.choice(esco_roles)
-        if src != tgt and (src, tgt) not in positive_set:
-            negatives.append((src, tgt))
-            positive_set.add((src, tgt))
+        pair = (src, tgt)
+        if src != tgt and pair not in seen_all:
+            random_negatives.append(pair)
+            seen_all.add(pair)
         attempts += 1
 
+    negatives = hard_negatives + random_negatives
     all_pairs = positives + negatives
     labels = np.array([1] * len(positives) + [0] * len(negatives), dtype=np.int32)
+
+    print(f"[link_prediction] Training data: {len(positives)} positives, "
+          f"{len(hard_negatives)} hard negatives, {len(random_negatives)} random negatives")
 
     features = np.zeros((len(all_pairs), len(FEATURE_NAMES)), dtype=np.float64)
     for i, (src, tgt) in enumerate(all_pairs):
@@ -338,6 +468,8 @@ def build_training_data(
             transition_index, neighbour_index,
             isco_cache.get(src, ""),
             isco_cache.get(tgt, ""),
+            title_vectors=title_vectors,
+            role_neighbours_3=role_neighbours_3,
         )
 
     return features, labels, all_pairs
@@ -438,12 +570,17 @@ def link_prediction_map(
 
     transition_index = build_transition_index(G)
     tr_source_roles = sorted(transition_index.keys())
-    neighbour_index = build_neighbour_index(G, embeddings or {}, tr_source_roles)
+    neighbour_index = build_neighbour_index(G, embeddings or {}, tr_source_roles, k=40)
 
     # Pre-compute caches for fast prediction
     skills_cache = _precompute_role_skills_cache(G)
     skill_degrees = _precompute_skill_degrees(G)
     isco_cache = {str(nid): str(d.get("isco_2digit", "")) for nid, d in G.nodes(data=True)}
+
+    # New features: title TF-IDF and meta-path
+    title_vectors = precompute_title_vectors(G)
+    all_role_ids = [str(nid) for nid, d in G.nodes(data=True) if d.get("type") == "role"]
+    role_neighbours_3 = precompute_role_neighbours_3(skills_cache, all_role_ids)
 
     # Determine which source roles to predict for
     if source_role_ids is not None:
@@ -473,6 +610,8 @@ def link_prediction_map(
                 idf_map, skill_degrees, embeddings,
                 transition_index, neighbour_index,
                 source_isco, isco_cache.get(tgt, ""),
+                title_vectors=title_vectors,
+                role_neighbours_3=role_neighbours_3,
             )
 
         scores = model.predict(features)

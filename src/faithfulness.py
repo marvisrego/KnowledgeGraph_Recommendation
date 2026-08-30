@@ -38,10 +38,11 @@ class FaithfulnessResult:
 
     def to_dict(self) -> dict:
         return {
-            "faithfulness_score": round(self.score, 4),
+            "score": round(self.score, 4),
             "total_entities": self.total_entities,
             "matched_count": self.matched_count,
             "reachable_count": self.reachable_count,
+            "matched_entities": [m.text for m in self.matches if m.reachable],
             "unmatched_entities": self.unmatched,
             "unreachable_entities": self.unreachable,
         }
