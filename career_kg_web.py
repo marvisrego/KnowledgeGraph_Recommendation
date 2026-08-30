@@ -24,7 +24,10 @@ def create_app():
     render_template = flask.render_template
     request = flask.request
 
-    app = Flask(__name__, template_folder="templates", static_folder="public", static_url_path="")
+    # Serve React build from public_react/ if it exists, else fall back to legacy public/
+    _react_dist = Path(__file__).resolve().parent / "public_react"
+    _static_folder = str(_react_dist) if _react_dist.exists() else "public"
+    app = Flask(__name__, template_folder="templates", static_folder=_static_folder, static_url_path="")
     app.config["JSON_SORT_KEYS"] = False
 
     settings = Settings.from_env(Path(__file__).resolve().parent)
@@ -109,11 +112,24 @@ def create_app():
 
     @app.get("/")
     def index():
+        # Serve React SPA if built, else legacy template
+        if _react_dist.exists():
+            return flask.send_from_directory(str(_react_dist), "index.html")
         return render_template("index.html")
 
     @app.get("/graph")
     def graph_view():
         return render_template("graph.html")
+
+    # React SPA catch-all: serve index.html for all non-API, non-static routes
+    @app.get("/<path:path>")
+    def spa_catch_all(path: str):
+        if _react_dist.exists() and not path.startswith("api/"):
+            react_file = _react_dist / path
+            if react_file.exists() and react_file.is_file():
+                return flask.send_from_directory(str(_react_dist), path)
+            return flask.send_from_directory(str(_react_dist), "index.html")
+        return flask.abort(404)
 
     @app.get("/api/graph-data")
     def graph_data():
@@ -303,7 +319,19 @@ def create_app():
                     transition_smoother=transition_smoother,
                     link_prediction_runtime=link_prediction_runtime,
                 )
-            return jsonify({"status": "ok", "message": result["message"], "courses": result.get("courses", []), "path": result.get("path", {}), "explore": result.get("explore", {}), "evidence": result.get("evidence", {}), "faithfulness": result.get("faithfulness"), "explanations": result.get("explanations", []), "metadata": result.get("metadata")})
+            return jsonify({
+                "status": "ok",
+                "message": result["message"],
+                "courses": result.get("courses", []),
+                "path": result.get("path", {}),
+                "explore": result.get("explore", {}),
+                "evidence": result.get("evidence", {}),
+                "faithfulness": result.get("faithfulness"),
+                "explanations": result.get("explanations", []),
+                "skill_gap_analysis": result.get("skill_gap_analysis", []),
+                "learning_plan": result.get("learning_plan", []),
+                "metadata": result.get("metadata"),
+            })
         except Exception as exc:
             return jsonify({"status": "error", "message": str(exc)}), 500
 

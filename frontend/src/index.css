@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+@theme {
+  /* Career Graph Studio — deep-space palette */
+  --color-bg-deep: #070a10;
+  --color-bg-panel: #0e141e;
+  --color-bg-raised: #151e2b;
+  --color-bg-interactive: #1a2635;
+  --color-ink: #eaf1f8;
+  --color-ink-soft: #a9b7c8;
+  --color-ink-muted: #7f91a7;
+  --color-line: #263447;
+  --color-accent: #4cc2ea;
+  --color-accent-strong: #79d8f3;
+  --color-accent-ink: #04151c;
+  --color-indigo: #8795ed;
+  --color-success: #5bd6a2;
+  --color-warn: #f1c15b;
+  --color-error: #ff919b;
+
+  --font-sans: "Outfit", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", monospace;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: #070a10;
+  color: #eaf1f8;
+  font-family: "Outfit", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom thin scrollbar */
+::-webkit-scrollbar {
+  width: 3px;
+  height: 3px;
+}
+::-webkit-scrollbar-track {
+  background: #263447;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(76, 194, 234, 0.4);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(76, 194, 234, 0.7);
+}

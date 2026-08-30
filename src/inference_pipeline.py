@@ -574,11 +574,24 @@ def fetch_coursera_courses(anchor_ids: list[str], G: nx.MultiDiGraph, user_type:
     queries = build_search_queries(role_titles[0], essential_skills[:5], fallback)
 
     try:
-        courses = search_course_recommendations_multi(queries, limit=5, timeout=15)
+        raw_courses = search_course_recommendations_multi(queries, limit=5, timeout=15)
     except Exception:
         return []
 
-    return courses if courses else []
+    # Normalize to frontend schema
+    courses = []
+    for c in (raw_courses or []):
+        partners = c.get("partner_names") or []
+        courses.append({
+            "title": c.get("title", ""),
+            "description": c.get("description") or c.get("tagline", ""),
+            "url": c.get("canonical_url", ""),
+            "provider": partners[0] if partners else "",
+            "estimated_workload": c.get("estimated_workload", ""),
+            "content_type": c.get("content_type", "course"),
+            "skills": [],
+        })
+    return courses
 
 
 # ---------------------------------------------------------------------------
@@ -945,7 +958,16 @@ def run_query(
     try:
         from src.transition_effort import transition_effort_score, get_idf_map, EffortWeights
 
-        if current_role_id and path_data.get("roles"):
+        roles = path_data.get("roles", [])
+        # Fall back to first recommended role as synthetic source when current role is unknown
+        # (covers student users and professionals whose role title could not be resolved).
+        effective_source_id = current_role_id
+        effort_source_label = "from_current_role"
+        if not effective_source_id and len(roles) >= 2:
+            effective_source_id = roles[0]["id"]
+            effort_source_label = "relative"
+
+        if effective_source_id and roles:
             idf_map = get_idf_map(G)
             weights = EffortWeights(
                 skill_gap=settings.effort_weight_skill_gap,
@@ -953,20 +975,32 @@ def run_query(
                 empirical=settings.effort_weight_empirical,
                 transferability=settings.effort_weight_transferability,
             )
-            for role_entry in path_data["roles"]:
+            owned = skill_evidence.get("skill_ids", set())
+            for role_entry in roles:
                 target_id = role_entry["id"]
-                if target_id == current_role_id:
+                if target_id == effective_source_id:
                     continue
-                effort = transition_effort_score(
-                    current_role_id, target_id,
-                    skill_evidence["skill_ids"], G, idf_map, weights,
-                    transition_smoother,
-                    settings.onet_importance_threshold,
-                )
-                role_entry["effort_score"] = round(effort.score, 4)
-                role_entry["effort_band"] = effort.band
+                try:
+                    effort = transition_effort_score(
+                        effective_source_id, target_id,
+                        owned, G, idf_map, weights,
+                        transition_smoother,
+                        settings.onet_importance_threshold,
+                    )
+                    role_entry["effort_score"] = round(effort.score, 4)
+                    role_entry["effort_band"] = effort.band
+                    role_entry["effort_source"] = effort_source_label
+                    role_entry["estimated_weeks_min"] = effort.estimated_weeks_min
+                    role_entry["estimated_weeks_max"] = effort.estimated_weeks_max
+                except Exception as exc:
+                    print(f"[inference_pipeline] Effort for {target_id}: {exc}")
     except Exception as exc:
         print(f"[inference_pipeline] Effort scoring failed (non-critical): {exc}")
+
+    # Re-sort roles by effort ascending (easiest first); unscoreds sort last.
+    path_data["roles"].sort(
+        key=lambda r: (r.get("effort_score") is None, r.get("effort_score", 999))
+    )
 
     # 7c. Faithfulness verification
     faithfulness_result = None

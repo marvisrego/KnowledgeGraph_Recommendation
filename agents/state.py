@@ -33,8 +33,17 @@ class CareerAgentState(TypedDict, total=False):
     # Graph traversal
     triples: list[tuple]
 
+    # Qualification (fraction of essential skills owned per role)
+    qualification_scores: dict[str, float]
+
     # Effort
     effort_scores: dict[str, dict]
+
+    # Skill gap analysis (priority missing skills per role)
+    skill_gap_analysis: list[dict]
+
+    # Learning plan (phased roadmap per role)
+    learning_plan: list[dict]
 
     # Generation
     response: str
