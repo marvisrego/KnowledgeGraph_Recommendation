@@ -20,7 +20,7 @@ export function LearningRoadmap({ plan }: Props) {
       <div className="px-4 py-3 border-b border-line flex items-center gap-2">
         <BookOpen className="w-4 h-4 text-indigo" />
         <span className="text-sm font-medium text-ink">Learning Roadmap</span>
-        <span className="ml-auto flex items-center gap-1 text-[11px] text-ink-muted font-mono">
+        <span className="ml-auto flex items-center gap-1 text-[13px] text-ink-muted font-mono">
           <Clock className="w-3 h-3" />
           ~{entry?.weeks_to_ready ?? 0} weeks total
         </span>
@@ -31,6 +31,7 @@ export function LearningRoadmap({ plan }: Props) {
         <div className="px-4 py-2 flex gap-2 overflow-x-auto border-b border-line">
           {plan.map((p, i) => (
             <button
+              aria-pressed={i === selectedRole}
               key={p.role_id}
               onClick={() => setSelectedRole(i)}
               className={cn(
@@ -70,16 +71,17 @@ function PhaseRow({ phase, isLast }: { phase: LearningPhase; isLast: boolean }) 
       {/* Content */}
       <div className={cn("flex-1 pb-3", isLast && "pb-0")}>
         <button
+          aria-expanded={isOpen}
           onClick={() => setIsOpen((v) => !v)}
           className="flex w-full items-start justify-between gap-2 text-left"
         >
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-mono text-indigo">Phase {phase.phase}</span>
-              <span className="text-[10px] text-ink-muted font-mono">Weeks {phase.weeks}</span>
+              <span className="text-xs text-ink-muted font-mono">Weeks {phase.weeks}</span>
             </div>
             <p className="text-sm font-medium text-ink mt-0.5">{phase.focus}</p>
-            <p className="text-[11px] text-ink-muted mt-0.5">
+            <p className="text-[13px] text-ink-muted mt-0.5">
               {phase.skills_unlocked} skills · {phase.courses.length} course{phase.courses.length !== 1 ? "s" : ""}
             </p>
           </div>
@@ -91,9 +93,9 @@ function PhaseRow({ phase, isLast }: { phase: LearningPhase; isLast: boolean }) 
         <AnimatePresence>
           {isOpen && (
             <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               transition={{ duration: 0.18 }}
               className="overflow-hidden"
             >
@@ -103,7 +105,7 @@ function PhaseRow({ phase, isLast }: { phase: LearningPhase; isLast: boolean }) 
                   {phase.skills?.map((s, j) => (
                     <span
                       key={j}
-                      className="rounded-full border border-indigo/20 bg-indigo/8 px-2 py-0.5 text-[10px] text-indigo"
+                      className="rounded-full border border-indigo/20 bg-indigo/8 px-2 py-0.5 text-xs text-indigo"
                     >
                       {s}
                     </span>
@@ -117,9 +119,9 @@ function PhaseRow({ phase, isLast }: { phase: LearningPhase; isLast: boolean }) 
                   >
                     <BookOpen className="w-3 h-3 text-indigo flex-shrink-0 mt-0.5" />
                     <div className="min-w-0">
-                      <p className="text-[11px] font-medium text-ink line-clamp-1">{course.title}</p>
+                      <p className="text-[13px] font-medium text-ink line-clamp-1">{course.title}</p>
                       {course.provider && (
-                        <p className="text-[10px] text-ink-muted font-mono">{course.provider}</p>
+                        <p className="text-xs text-ink-muted font-mono">{course.provider}</p>
                       )}
                     </div>
                     {course.url && (
@@ -127,7 +129,7 @@ function PhaseRow({ phase, isLast }: { phase: LearningPhase; isLast: boolean }) 
                         href={course.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="ml-auto flex-shrink-0 text-[10px] text-accent hover:underline"
+                        className="ml-auto flex-shrink-0 text-xs text-accent hover:underline"
                       >
                         Open →
                       </a>

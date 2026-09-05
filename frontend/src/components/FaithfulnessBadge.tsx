@@ -17,7 +17,7 @@ export function FaithfulnessBadge({ faithfulness }: Props) {
     <div
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-mono",
-        "backdrop-blur-sm transition-colors",
+        "faithfulness-badge transition-colors",
         isHigh
           ? "border-success/25 bg-success/8 text-success"
           : isMed

@@ -29,15 +29,16 @@ export function StatusPanel() {
     : []
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="studio-panel">
       {/* Header */}
-      <div>
+      <div className="studio-brand">
+        <div className="studio-mark" aria-hidden="true"><Network /></div>
         <div className="flex items-center gap-2 mb-1">
-          <span className="text-[10px] font-mono uppercase tracking-widest text-ink-muted">
+          <span className="text-xs font-mono uppercase tracking-widest text-ink-muted">
             Retrieve → Reason → Rank → Advise
           </span>
         </div>
-        <h1 className="text-2xl font-bold text-ink tracking-tight">Career Graph Studio</h1>
+        <h1 className="studio-title">Career Graph Studio</h1>
         <p className="text-sm text-ink-soft mt-1 leading-relaxed">
           GraphRAG-powered career advisor using O*NET, ESCO, and real career transition data.
         </p>
@@ -45,32 +46,33 @@ export function StatusPanel() {
 
       {/* Status cards */}
       {error ? (
-        <div className="flex items-center gap-2 text-sm text-error">
+        <div className="studio-status-error flex items-center gap-2 text-sm text-error" role="status">
           <XCircle className="w-4 h-4" /> Server unavailable
         </div>
       ) : cards.length > 0 ? (
-        <div className="grid grid-cols-2 gap-2">
+        <div className="studio-status" aria-label="System status" aria-live="polite">
           {cards.map((c) => (
             <div
               key={c.label}
-              className="rounded-xl border border-line bg-bg-raised px-3 py-2.5 flex flex-col gap-1"
+              className="studio-stat"
             >
               <div className="flex items-center gap-1.5">
                 <c.icon
-                  className={cn("w-3 h-3", c.ok ? "text-success" : "text-warn")}
+                  aria-hidden="true"
+                  className={cn("w-3.5 h-3.5", c.label === "Status" ? (c.ok ? "text-success" : "text-warn") : "text-ink-muted")}
                 />
-                <span className="text-[10px] font-mono text-ink-muted uppercase tracking-wide">
+                <span className="text-xs font-mono text-ink-muted uppercase tracking-wide">
                   {c.label}
                 </span>
               </div>
-              <span className="text-sm font-semibold text-ink font-mono truncate">{c.value}</span>
+              <span className="studio-stat-value" title={c.value}>{c.value}</span>
             </div>
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-2">
+        <div className="studio-status" aria-label="Loading system status" aria-busy="true">
           {["Status", "Model", "Nodes", "Edges"].map((l) => (
-            <div key={l} className="h-16 rounded-xl border border-line bg-bg-raised animate-pulse" />
+            <div key={l} className="studio-stat min-h-20 animate-pulse bg-bg-raised" />
           ))}
         </div>
       )}
@@ -78,18 +80,18 @@ export function StatusPanel() {
       {/* Graph link */}
       <a
         href="/graph"
-        className="flex items-center gap-2 rounded-xl border border-line bg-bg-raised px-4 py-3 text-sm text-ink-soft hover:text-accent hover:border-accent/40 transition-colors"
+        className="studio-graph-link"
       >
         <Network className="w-4 h-4 text-accent" />
         Explore knowledge graph →
       </a>
 
       {/* Tech badges */}
-      <div className="flex flex-wrap gap-2">
+      <div className="studio-sources">
         {["GraphRAG", "O*NET", "ESCO", "Karrierewege", "LangGraph"].map((t) => (
           <span
             key={t}
-            className="rounded-full border border-line px-3 py-1 text-[10px] font-mono text-ink-muted uppercase tracking-wide"
+            className="text-xs text-ink-muted"
           >
             {t}
           </span>

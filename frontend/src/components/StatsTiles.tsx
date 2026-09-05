@@ -71,18 +71,18 @@ export function StatsTiles({ role }: Props) {
   if (tiles.length === 0) return null
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+    <div className="stats-tiles">
       {tiles.map((tile, i) => (
         <motion.div
           key={tile.label}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: i * 0.05 }}
-          className="rounded-xl border border-line bg-bg-raised px-3 py-3 flex flex-col gap-1"
+          className="stat-tile"
         >
           <div className="flex items-center gap-1.5">
             <tile.icon className={cn("w-3 h-3", tile.color)} />
-            <span className="text-[10px] font-mono text-ink-muted uppercase tracking-wide truncate">
+            <span className="text-xs font-mono text-ink-muted uppercase tracking-wide truncate">
               {tile.label}
             </span>
           </div>
@@ -90,7 +90,7 @@ export function StatsTiles({ role }: Props) {
             {tile.value}
           </span>
           {tile.sub && (
-            <span className="text-[10px] text-ink-muted truncate">{tile.sub}</span>
+            <span className="text-xs text-ink-muted truncate">{tile.sub}</span>
           )}
         </motion.div>
       ))}

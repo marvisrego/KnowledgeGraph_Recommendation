@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
 import { cn } from "@/lib/utils"
 
 const STAGES = [
@@ -17,6 +17,7 @@ interface Props {
 }
 
 export function PipelineIndicator({ visible }: Props) {
+  const reduceMotion = useReducedMotion()
   const [activeIdx, setActiveIdx] = useState(0)
 
   useEffect(() => {
@@ -37,18 +38,19 @@ export function PipelineIndicator({ visible }: Props) {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
-          className="flex flex-col gap-3 rounded-xl border border-line bg-bg-raised px-5 py-4 w-fit max-w-sm"
+          role="status"
+          className="pipeline-indicator flex flex-col gap-4 rounded-xl border border-line bg-bg-raised px-4 py-5 w-fit max-w-full"
         >
-          <div className="flex items-center gap-2">
+          <div className="pipeline-stages">
             {STAGES.map((stage, i) => (
               <div key={stage.key} className="flex items-center gap-2">
                 <div className="flex flex-col items-center gap-1">
                   <motion.div
                     animate={{
-                      scale: i === activeIdx ? [1, 1.25, 1] : 1,
+                      scale: i === activeIdx && !reduceMotion ? [1, 1.25, 1] : 1,
                       opacity: i <= activeIdx ? 1 : 0.25,
                     }}
-                    transition={{ repeat: i === activeIdx ? Infinity : 0, duration: 0.8 }}
+                    transition={{ repeat: i === activeIdx && !reduceMotion ? Infinity : 0, duration: reduceMotion ? 0 : 0.8 }}
                     className={cn(
                       "w-2 h-2 rounded-full transition-colors duration-300",
                       i < activeIdx
@@ -60,8 +62,8 @@ export function PipelineIndicator({ visible }: Props) {
                   />
                   <span
                     className={cn(
-                      "text-[9px] font-mono uppercase tracking-wider transition-colors duration-300",
-                      i === activeIdx ? "text-accent" : i < activeIdx ? "text-success" : "text-ink-muted/40",
+                      "text-[13px] font-mono uppercase tracking-wider transition-colors duration-300",
+                      i === activeIdx ? "text-accent" : i < activeIdx ? "text-success" : "text-ink-muted",
                     )}
                   >
                     {stage.label}
@@ -78,7 +80,7 @@ export function PipelineIndicator({ visible }: Props) {
               </div>
             ))}
           </div>
-          <p className="text-[11px] text-ink-muted font-mono">
+          <p className="text-[13px] text-ink-muted font-mono">
             {STAGES[activeIdx]?.label === "Intent"
               ? "Understanding your goals…"
               : STAGES[activeIdx]?.label === "Retrieve"

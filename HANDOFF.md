@@ -1,6 +1,6 @@
 # GraphRAG Career Advisor — Session Handoff
 
-## Project State (as of 2026-09-05)
+## Project State (as of 2026-09-06)
 
 GraphRAG career chatbot for a thesis. **React frontend + LangGraph 12-node pipeline. Fully built and running.**
 
@@ -14,6 +14,16 @@ GraphRAG career chatbot for a thesis. **React frontend + LangGraph 12-node pipel
 - **Rebuild:** `python rebuild_databases.py` prepares, evaluates, rebuilds, and validates both dedicated cloud databases
 - **Vercel:** deployment completed from `dev`; `app.py` serves the bundled React build and LP model, while raw data and local graph/vector artifacts stay excluded
 - **GitHub Actions:** cloud-training secrets, `QDRANT_COLLECTION=career_roles`, read/write workflow permissions, and pull-request creation are configured at repository level
+
+### 2026-09-06 main advisor UI refresh
+
+- Refined the main React advisor surface while preserving the existing API, conversation state, controls, routes, and response rendering behavior.
+- Added a clearer evidence-led welcome state, bounded conversation column, larger labeled composer, stronger focus states, and improved desktop/tablet/mobile spacing.
+- Reworked role, stats, course, evidence, learning-plan, and pipeline presentation for clearer hierarchy and more readable content density.
+- Added semantic status/expanded-state attributes, a skip link, explicit message field metadata, reduced-motion handling, safe-area padding, and improved dark-theme contrast.
+- Regenerated the committed `public_react/` Vite bundle for Flask and Vercel.
+- Verification: `npm.cmd run build` passed; Playwright interaction checks passed at 1440, 1280, 820, 390, and 320px with no console errors, overflow, or axe violations. `npm.cmd run lint` passed with one non-blocking existing state-in-effect warning in `PipelineIndicator`.
+- A local `/api/status` request returned HTTP 200 but reported the external Qdrant Cloud connectivity check as unavailable in this environment; no UI code depends on that local connectivity result.
 
 ### 2026-09-05 cloud migration result
 

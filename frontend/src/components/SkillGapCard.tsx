@@ -23,6 +23,7 @@ export function SkillGapCard({ entries }: Props) {
         {entries.slice(0, 3).map((entry, i) => (
           <div key={entry.role_id}>
             <button
+              aria-expanded={openIdx === i}
               onClick={() => setOpenIdx(openIdx === i ? null : i)}
               className="flex w-full items-center justify-between px-4 py-2.5 hover:bg-bg-interactive transition-colors"
             >
@@ -34,9 +35,9 @@ export function SkillGapCard({ entries }: Props) {
             <AnimatePresence>
               {openIdx === i && (
                 <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
                   transition={{ duration: 0.2 }}
                   className="overflow-hidden"
                 >
@@ -44,14 +45,14 @@ export function SkillGapCard({ entries }: Props) {
                     {/* Priority skills */}
                     {entry.priority_skills.length > 0 && (
                       <div>
-                        <p className="text-[10px] font-mono text-ink-muted uppercase tracking-wide mb-1.5">
+                        <p className="text-xs font-mono text-ink-muted uppercase tracking-wide mb-1.5">
                           Learn first (highest impact)
                         </p>
                         <div className="flex flex-wrap gap-1">
                           {entry.priority_skills.map((ps, j) => (
                             <span
                               key={j}
-                              className="inline-flex items-center gap-1 rounded-full border border-accent/20 bg-accent/8 px-2.5 py-1 text-[11px] text-accent"
+                              className="inline-flex items-center gap-1 rounded-full border border-accent/20 bg-accent/8 px-2.5 py-1 text-[13px] text-accent"
                               title={`TES reduction: ${(ps.tes_reduction * 100).toFixed(1)}%`}
                             >
                               {ps.skill}
@@ -64,14 +65,14 @@ export function SkillGapCard({ entries }: Props) {
                       {/* Quick wins */}
                       {entry.quick_wins.length > 0 && (
                         <div>
-                          <p className="text-[10px] font-mono text-success uppercase tracking-wide mb-1">
+                          <p className="text-xs font-mono text-success uppercase tracking-wide mb-1">
                             ✓ Your strengths
                           </p>
                           <div className="flex flex-wrap gap-1">
                             {entry.quick_wins.map((qw, j) => (
                               <span
                                 key={j}
-                                className="rounded-full border border-success/20 bg-success/8 px-2 py-0.5 text-[10px] text-success"
+                                className="rounded-full border border-success/20 bg-success/8 px-2 py-0.5 text-xs text-success"
                               >
                                 {qw.skill}
                               </span>
@@ -82,7 +83,7 @@ export function SkillGapCard({ entries }: Props) {
                       {/* Blockers */}
                       {entry.blockers.length > 0 && (
                         <div>
-                          <p className="text-[10px] font-mono text-error uppercase tracking-wide mb-1">
+                          <p className="text-xs font-mono text-error uppercase tracking-wide mb-1">
                             <AlertTriangle className="w-3 h-3 inline mr-0.5" />
                             Key gaps
                           </p>
@@ -90,7 +91,7 @@ export function SkillGapCard({ entries }: Props) {
                             {entry.blockers.map((bl, j) => (
                               <span
                                 key={j}
-                                className="rounded-full border border-error/20 bg-error/8 px-2 py-0.5 text-[10px] text-error"
+                                className="rounded-full border border-error/20 bg-error/8 px-2 py-0.5 text-xs text-error"
                               >
                                 {bl.skill}
                               </span>
