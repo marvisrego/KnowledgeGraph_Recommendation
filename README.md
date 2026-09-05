@@ -80,7 +80,7 @@ Structured Career Recommendation
 | Link Prediction | LightGBM cloud training; portable JSON/NumPy inference on Vercel |
 | Agent Orchestration | LangGraph StateGraph (12 nodes) |
 | Backend | Flask (Python 3.13) |
-| Frontend | React 19 + Vite + shadcn/ui + Tailwind CSS v4 + Framer Motion |
+| Frontend | React 19 + Vite + Tailwind CSS v4 + Framer Motion |
 
 ## Run Locally
 
@@ -131,11 +131,11 @@ Configure these GitHub Actions repository secrets:
 
 Optionally set the repository variable `QDRANT_COLLECTION`; it defaults to `career_roles`. The workflow does not require chat, embedding, or reranking API keys because it reuses vectors already stored in Qdrant.
 
-Because the repository default branch is `main`, merge the workflow into `main` once so GitHub displays its manual **Run workflow** button. Then open **Actions → Train link-prediction model → Run workflow**, keep `target_branch=dev`, and enable pull-request publishing. Review and merge the generated PR; Vercel will then build the updated portable model from `dev`.
+Because the repository default branch is `main`, the workflow must exist on `main` for GitHub to display its manual **Run workflow** button. Run it with `target_branch=dev` and pull-request publishing enabled; after review, merge the generated model PR so Vercel builds the updated portable model from `dev`.
 
-Under **Settings → Actions → General → Workflow permissions**, enable read/write workflow permissions and allow GitHub Actions to create pull requests. The workflow requests only `contents: write` and `pull-requests: write`; it runs only when manually started.
+The repository is configured with all six required cloud secrets, `QDRANT_COLLECTION=career_roles`, read/write workflow permissions, and permission for Actions to create pull requests. `NEO4J_DATABASE` remains optional. The workflow requests only `contents: write` and `pull-requests: write`; it runs only when manually started.
 
-The workflow uploads the candidate model and redacted metrics as a 30-day Actions artifact. It never writes predicted relationships to AuraDB and does not expose endpoint or credential values in the report.
+The workflow uploads the candidate model and redacted metrics as a 7-day Actions artifact. Its job timeout is 30 minutes, it never writes predicted relationships to AuraDB, and it does not expose endpoint or credential values in the report.
 
 ## Rebuild the cloud databases
 
@@ -216,7 +216,7 @@ agents/
     faithfulness_node.py    Post-generation verification
     explanation.py          Evidence chain tracing
 
-frontend/                   React 19 + Vite + shadcn/ui + Tailwind v4
+frontend/                   React 19 + Vite + Tailwind v4
   src/
     components/
       ChatShell.tsx         Main chat layout + message rendering

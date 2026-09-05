@@ -25,7 +25,7 @@ concurrency:
 jobs:
   train:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 30
     env:
       KG_URI: ${{ secrets.KG_URI }}
       KG_USER: ${{ secrets.KG_USER }}
@@ -75,7 +75,7 @@ jobs:
           name: link-prediction-${{ github.run_id }}-${{ github.run_attempt }}
           path: artifacts/link_prediction/cloud_run/
           if-no-files-found: warn
-          retention-days: 30
+          retention-days: 7
 
       - name: Create validated model pull request
         if: ${{ success() && inputs.publish_pull_request }}

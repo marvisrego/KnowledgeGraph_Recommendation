@@ -989,7 +989,7 @@ The rebuilt graph/vector result matches the accepted local method within roughly
 
 `career_kg_web.py` now lazy-loads the graph from Aura and vectors from Qdrant. The Qdrant adapter preserves the retrieval interface used by the classic and LangGraph pipelines, so query text is embedded with the same model and searched remotely without changing downstream ranking semantics.
 
-`vercel.json` packages `templates/`, legacy `public/`, the committed `public_react/` production build, and the small LP model. It excludes raw datasets, local graph/index directories, tests, evaluation outputs, and agent tooling. ChromaDB was removed from runtime dependencies. The Python function duration is set to 300 seconds for cloud-backed cold starts and model calls.
+`vercel.json` packages `templates/`, the committed `public_react/` production build, and the small portable LP model. It excludes raw datasets, local graph/index directories, tests, evaluation outputs, and agent tooling. ChromaDB was removed from runtime dependencies. The Python function duration is set to 300 seconds for cloud-backed cold starts and model calls.
 
 The GitHub `dev` branch is connected and deployed on Vercel. Required model/cloud values are supplied through Vercel Project Settings and `.env` remains uncommitted. The database rebuild is an offline administration command and must not be run during a Vercel build or request.
 
@@ -1025,6 +1025,15 @@ The GitHub `dev` branch is connected and deployed on Vercel. Required model/clou
 2. Added source-role-disjoint GroupKFold validation. Held-out source transitions are removed from fold-specific neighbour-evidence features.
 3. Added classification and ranking promotion gates: AUC >= 0.87, AP >= 0.68, Hits@5 >= 0.89, and MRR >= 0.78.
 4. The production-data smoke run trained on 113,442 sampled pairs and passed with AUC 0.883384, AP 0.702746, Hits@5 0.912418, and MRR 0.801180. These internal sampled-negative metrics are not directly comparable to the official Karrierewege test split.
-5. Added `.github/workflows/train-link-prediction.yml`. A manual run installs training-only dependencies on Ubuntu, tests, trains, uploads a 30-day artifact, and optionally opens a validated model PR against `dev`.
+5. Added `.github/workflows/train-link-prediction.yml`. A manual run installs training-only dependencies on Ubuntu, tests, trains, uploads a 7-day artifact, and optionally opens a validated model PR against `dev`.
 6. GitHub Pages is not used. Vercel remains the React/Flask deployment, while GitHub Actions supplies ephemeral training compute.
-7. Before the first run, add the six cloud credentials as GitHub Actions secrets, enable Actions read/write and pull-request creation, and merge the workflow into the default `main` branch so the manual Run workflow button becomes available.
+7. Configured the six cloud credentials as GitHub Actions secrets, set `QDRANT_COLLECTION=career_roles`, and enabled Actions read/write plus pull-request creation. Secret values were not printed or committed. The workflow still needs to be merged into the default `main` branch before its first manual run.
+
+### GitHub/Vercel repository cleanup and delivery
+
+1. Reduced the manual trainer timeout from 180 to 30 minutes and artifact retention from 30 to 7 days, avoiding scheduled runs and unnecessary Student/Pro Actions usage.
+2. Removed the obsolete LightGBM pickle, legacy vanilla chat page, unused Vite starter assets, unused UI scaffolding, and unused Radix/Cytoscape packages.
+3. Kept the `/graph` viewer and moved its CSS/JS to `frontend/public/`; the Vite build copies both into `public_react/`, which is now Flask's only static root.
+4. Removed generated local graph/index stores, cloud preparation/smoke caches, and the accidental workspace `~/` directory after verifying every target was inside the repository workspace.
+5. Preserved ignored `Data/` because it is the only complete source input for `python rebuild_databases.py`; it remains excluded from Git and Vercel.
+6. Rebuilt the production frontend and verified the resulting `public_react/` bundle contains the SPA and graph-viewer assets.

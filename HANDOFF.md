@@ -7,12 +7,13 @@ GraphRAG career chatbot for a thesis. **React frontend + LangGraph 12-node pipel
 - **Branch:** `dev`
 - **Remote:** `https://github.com/marvisrego/KnowledgeGraph_Recommendation.git`
 - **Server:** `python career_kg_web.py` → `http://127.0.0.1:8001`
-- **Frontend:** React 19 + Vite + shadcn/ui + Tailwind CSS v4 (built to `public_react/`, served by Flask)
+- **Frontend:** React 19 + Vite + Tailwind CSS v4 (built to `public_react/`, served by Flask)
 - **Knowledge graph:** Neo4j AuraDB, rebuilt and live with 19,241 nodes and 240,906 relationships
 - **Vector database:** Qdrant Cloud, rebuilt and live with 3,932 role vectors at 3,072 dimensions
 - **Runtime:** Aura is loaded into a NetworkX compatibility snapshot; semantic retrieval runs against Qdrant
 - **Rebuild:** `python rebuild_databases.py` prepares, evaluates, rebuilds, and validates both dedicated cloud databases
 - **Vercel:** deployment completed from `dev`; `app.py` serves the bundled React build and LP model, while raw data and local graph/vector artifacts stay excluded
+- **GitHub Actions:** cloud-training secrets, `QDRANT_COLLECTION=career_roles`, read/write workflow permissions, and pull-request creation are configured at repository level
 
 ### 2026-09-05 cloud migration result
 
@@ -89,12 +90,9 @@ tests/                        Deterministic offline unit tests
 build_graph.py                CLI: graph, alignment, and transition build modes
 career_kg_web.py              Flask server — port 8001
 coursera_client.py            Coursera search scraper (no API key needed)
-templates/index.html          Chat UI
 templates/graph.html          Interactive Cytoscape.js knowledge graph viewer
-public/chat.js                Frontend JS — career path visual, explore panels, course cards
-public/chat.css               Frontend CSS
-public/graph.js               Graph loading, interaction, selection, and recovery states
-public/graph.css              Responsive graph workspace styling
+frontend/                     React/Vite source; frontend/public contains graph viewer assets
+public_react/                 Committed production build served by Flask/Vercel
 test_apis.py                  Smoke-test for Azure embed + Cohere rerank
 novelty.md                    Research contributions: Part 1 = implemented (A/B/C); Part 2 = proposed for supervisor (P1–P4)
 ALL_STEPS.md                  Chronological history, implementation, commands, and results
@@ -117,12 +115,12 @@ ALL_STEPS.md                  Chronological history, implementation, commands, a
 | Similarity threshold | 0.65 (cosine, ONET↔ESCO alignment) |
 | ONET importance threshold | 3.5 (IM scale) |
 
-**Cloud and local report locations:**
+**Cloud and reproducibility locations:**
 ```
 Neo4j AuraDB              Authoritative career knowledge graph
 Qdrant Cloud              Authoritative role vector collection
-artifacts/cloud_rebuild/  Ignored redacted rebuild/preparation reports and retry cache
-graph/ and index/         Ignored legacy/offline assets; not used by runtime
+Data/                     Ignored source datasets retained locally for a future full rebuild
+graph/ and index/         Removed legacy local databases; not used by runtime
 ```
 
 ---
@@ -471,7 +469,7 @@ The supervisor requested: (1) a metric to measure effort/difficulty of career tr
 
 1. **Transition Effort Score (TES)** — `src/transition_effort.py`. Multi-factor composite: `TES = w1*SkillGapMagnitude + w2*DomainDistance + w3*(1-EmpiricalSupport) + w4*(1-Transferability)`. IDF-weighted skill gap measures rare vs common skill difficulty. ISCO Jaccard distance measures cross-domain difficulty. Empirical support uses TRANSITIONS_TO edges + smoother. Transferability measures IDF-weighted shared skills. Effort bands: Low (0–0.3), Moderate (0.3–0.6), High (0.6–1.0). Integrated into `inference_pipeline.py` — effort badges displayed on career-path role cards.
 
-2. **KG Link Prediction** — `src/link_prediction.py`, `evaluation/evaluate_link_prediction.py`. 9 graph-structural features (Common Neighbours, Jaccard, Adamic-Adar, Resource Allocation, Preferential Attachment, Embedding Cosine Sim, Same ISCO Group, IDF Skill Overlap, Neighbour Evidence). LightGBM classifier trained on 18,907 positive + 94,535 negative samples. **5-fold CV AUC: 0.9344, AP: 0.8186**. Top features: Neighbour Evidence (426K gain), Embedding Cosine Sim (44K). Offline model: `artifacts/link_prediction/link_predictor.pkl`; portable deployment export: `artifacts/link_prediction/link_predictor.json`. Source coverage: 100%.
+2. **KG Link Prediction** — `src/link_prediction.py`, `evaluation/evaluate_link_prediction.py`. 9 graph-structural features (Common Neighbours, Jaccard, Adamic-Adar, Resource Allocation, Preferential Attachment, Embedding Cosine Sim, Same ISCO Group, IDF Skill Overlap, Neighbour Evidence). LightGBM classifier trained on 18,907 positive + 94,535 negative samples. **5-fold CV AUC: 0.9344, AP: 0.8186**. Top features: Neighbour Evidence (426K gain), Embedding Cosine Sim (44K). Production uses the portable `artifacts/link_prediction/link_predictor.json`; the obsolete pickle copy was removed. Source coverage: 100%.
 
 3. **Graph-Provenance Faithfulness Verification** — `src/faithfulness.py`. Extracts bolded plus unbolded role/skill candidates, resolves normalized graph labels and safe short aliases such as parenthetical skill names, then checks BFS reachability within 3 hops. Score = |matched & reachable| / |total entities|.
 
@@ -619,4 +617,13 @@ This section records the August 15 checkpoints. The current 2026-08-27 metrics, 
 - The verified cloud-data smoke run used 113,442 pairs (18,907 positive) and produced AUC 0.883384, AP 0.702746, Hits@1 0.718954, Hits@3 0.857516, Hits@5 0.912418, Hits@10 0.950327, and MRR 0.801180. These sampled-negative source-grouped diagnostics are a promotion gate, not a replacement for the separate Karrierewege held-out benchmark.
 - An accepted run exports a portable model, uploads the model/report as a GitHub artifact, and can open a model-update PR against `dev`. It never writes predicted edges to AuraDB.
 - Required Actions secrets are `KG_URI`, `KG_USER`, `KG_PASS`, `KG_ID`, `VECTOR_ENDPOINT`, and `VECTOR_PASS`; `NEO4J_DATABASE` is optional and `QDRANT_COLLECTION` is an optional repository variable.
-- The full verification suite is now 150 tests. GitHub currently has no Actions secrets or repository variables configured, so the owner must add them and allow Actions to create pull requests before the first run.
+- The full verification suite is now 150 tests. All six required Actions secrets and the `QDRANT_COLLECTION` repository variable are configured, and Actions has read/write plus pull-request creation permission. Secret values were never printed or committed.
+
+### 2026-09-05 repository and Actions cleanup
+
+- Reduced the manual cloud-training job timeout from 180 to 30 minutes and candidate artifact retention from 30 to 7 days to stay lightweight on the GitHub Student/Pro allowance.
+- Removed the obsolete pickle model, vanilla chat template/assets, unused Vite starter images, unused component scaffolding, and their Radix/Cytoscape npm dependencies.
+- Moved the retained graph viewer CSS/JS into `frontend/public/`; Vite now copies them into `public_react/`, the single static root served by Flask and packaged by Vercel.
+- Removed generated local `graph/`, `index/`, cloud rebuild cache, cloud smoke output, and the accidental workspace `~/` directory. The hosted Aura/Qdrant databases remain authoritative, and the generated caches can be recreated.
+- Preserved ignored `Data/` source files because they are still required by `rebuild_databases.py` for a complete from-source rebuild.
+- The remaining delivery sequence is to merge `dev` into default `main`, run the workflow against `dev`, and merge its validated model PR if the promotion gates pass.

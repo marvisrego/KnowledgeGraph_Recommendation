@@ -3,7 +3,7 @@
   "functions": {
     "app.py": {
       "maxDuration": 300,
-      "includeFiles": "{templates/**,public/**,public_react/**,artifacts/link_prediction/link_predictor.json}",
+      "includeFiles": "{templates/**,public_react/**,artifacts/link_prediction/link_predictor.json}",
       "excludeFiles": "{.venv/**,venv/**,__pycache__/**,Data/**,docs/**,evaluation/**,tests/**,.github/**,.agents/**,.claude/**,.antigravitycli/**,graph/**,index/**,train_link_prediction_cloud.py,requirements-research.txt,requirements-training.txt}"
     }
   }
