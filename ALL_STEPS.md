@@ -1041,3 +1041,4 @@ The GitHub `dev` branch is connected and deployed on Vercel. Required model/clou
 8. Triggered GitHub Actions run `33975475939` with `target_branch=dev`. The standard Ubuntu job completed successfully in 2m57s, including focused tests, Aura/Qdrant loading, grouped validation, model export, and artifact upload.
 9. The cloud run produced AUC `0.883507`, AP `0.702902`, Hits@1 `0.713725`, Hits@3 `0.853595`, Hits@5 `0.911111`, Hits@10 `0.949020`, and MRR `0.797201`; every configured publication gate passed.
 10. The workflow opened PR #8 containing only the validated portable model. Its Vercel preview passed and the PR was merged into `dev` as `32ce418`.
+11. Final production smoke checks passed: the public React root returned HTTP 200, `/api/status` reported Aura/Qdrant/smoothing/link prediction ready with no error, and a representative `/api/chat` request returned HTTP 200 with a structured path payload.
