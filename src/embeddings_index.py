@@ -52,7 +52,7 @@ def _post_json(url: str, payload: dict, headers: dict, timeout: int = 60) -> dic
 def embed_texts(texts: list[str], settings: "Settings") -> list[list[float]]:
     """Embed a list of texts using the Azure embedding endpoint.
 
-    Batches requests to settings.embed_batch_size and retries on 429.
+    Batches requests and retries transient timeouts, rate limits, and 5xx errors.
     Returns a list of float vectors in the same order as input texts.
     """
     if not settings.embed_model_api_key:
@@ -74,16 +74,26 @@ def embed_texts(texts: list[str], settings: "Settings") -> list[list[float]]:
         batch = texts[batch_start : batch_start + batch_size]
         payload = {"model": settings.embed_model, "input": batch}
 
-        # Retry loop with exponential backoff for rate limits
-        max_retries = 5
+        # API gateways can occasionally time out during an otherwise healthy
+        # full rebuild. Retry only transient errors; invalid requests still fail.
+        max_retries = 6
         for attempt in range(max_retries):
             try:
                 result = _post_json(url, payload, headers)
                 break
             except RuntimeError as exc:
-                if "HTTP 429" in str(exc) and attempt < max_retries - 1:
-                    wait = 2 ** attempt
-                    print(f"[embeddings_index] Rate limited; retrying in {wait}s …")
+                message = str(exc)
+                retryable = (
+                    any(f"HTTP {status}" in message for status in (408, 429, 500, 502, 503, 504))
+                    or "Connection error" in message
+                )
+                if retryable and attempt < max_retries - 1:
+                    wait = min(2 ** attempt, 16)
+                    print(
+                        f"[embeddings_index] Transient embedding failure; "
+                        f"retrying in {wait}s ({attempt + 1}/{max_retries - 1}) ...",
+                        flush=True,
+                    )
                     time.sleep(wait)
                 else:
                     raise

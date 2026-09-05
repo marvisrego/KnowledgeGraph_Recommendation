@@ -9,8 +9,8 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).parent))
 
 from config import Settings
-from src.graph_store import load_graph
-from src.embeddings_index import load_chroma_collection
+from src.neo4j_store import load_graph_from_neo4j
+from src.qdrant_store import load_qdrant_collection
 from src.inference_pipeline import run_query
 from src.transition_embedding import RuntimeTransitionSmoother, SmoothingConfig
 from src.transition_policy import is_training_transition
@@ -32,7 +32,7 @@ def create_app():
 
     settings = Settings.from_env(Path(__file__).resolve().parent)
 
-    # --- Lazy-load graph and ChromaDB (once per process) ---
+    # --- Lazy-load the Aura graph snapshot and Qdrant adapter (once per process) ---
     _cache: dict[str, Any] = {
         "graph": None,
         "collection": None,
@@ -53,12 +53,12 @@ def create_app():
             with _resource_lock:
                 if _cache["graph"] is None:
                     try:
-                        _cache["graph"] = load_graph(settings.graph_path)
+                        _cache["graph"] = load_graph_from_neo4j(settings)
                     except RuntimeError as exc:
                         _cache["error"] = str(exc)
                 if _cache["collection"] is None:
                     try:
-                        _cache["collection"] = load_chroma_collection(settings)
+                        _cache["collection"] = load_qdrant_collection(settings)
                     except RuntimeError as exc:
                         _cache["error"] = str(exc)
         return _cache["graph"], _cache["collection"]
@@ -239,7 +239,7 @@ def create_app():
             {
                 "ready": G is not None and collection is not None,
                 "graph_loaded": G is not None,
-                "chroma_loaded": collection is not None,
+                "qdrant_loaded": collection is not None,
                 "graph_nodes": G.number_of_nodes() if G else 0,
                 "graph_edges": G.number_of_edges() if G else 0,
                 "transition_edges": (

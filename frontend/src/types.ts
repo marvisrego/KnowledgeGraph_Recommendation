@@ -115,7 +115,7 @@ export interface Message {
 export interface StatusResponse {
   ready: boolean
   graph_loaded: boolean
-  chroma_loaded: boolean
+  qdrant_loaded: boolean
   graph_nodes: number
   graph_edges: number
   chat_model: string

@@ -25,8 +25,6 @@ models/
 
 # --- Documentation and project records (kept locally, not deployed) ---
 docs/
-evaluation/
-tests/
 
 # --- Build/utility scripts (not needed at runtime) ---
 /build_graph.py
@@ -36,20 +34,11 @@ tests/
 /career_kg_chat.py
 /coursera_api_check.py
 
-# --- Preprocessing modules (only needed for graph build, not runtime) ---
-/src/esco_preprocessing.py
-/src/graph_build.py
-/src/karrierewege_preprocessing.py
-/src/onet_preprocessing.py
-
-# --- React build output (generated — not source) ---
-/public_react/
+# --- React build (committed for Vercel); local dependencies stay ignored ---
 /frontend/dist/
 /frontend/node_modules/
 
 # --- Project records and planning docs (local only) ---
-HANDOFF.md
-ALL_STEPS.md
 ARCHITECTURE.md
 ARCHITECTURE.html
 novelty.md

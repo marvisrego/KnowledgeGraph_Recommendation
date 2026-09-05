@@ -2,8 +2,9 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
     "app.py": {
-      "includeFiles": "templates/**",
-      "excludeFiles": "{.venv/**,venv/**,__pycache__/**,Data/**,artifacts/**,docs/**,evaluation/**,tests/**,.agents/**,.claude/**,.antigravitycli/**,public/**,graph/**,index/**}"
+      "maxDuration": 300,
+      "includeFiles": "{templates/**,public/**,public_react/**,artifacts/link_prediction/link_predictor.pkl}",
+      "excludeFiles": "{.venv/**,venv/**,__pycache__/**,Data/**,docs/**,evaluation/**,tests/**,.agents/**,.claude/**,.antigravitycli/**,graph/**,index/**}"
     }
   }
 }

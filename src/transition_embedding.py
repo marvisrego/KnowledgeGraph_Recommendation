@@ -113,7 +113,7 @@ def load_live_esco_embeddings(
     graph: nx.MultiDiGraph,
     batch_size: int = 256,
 ) -> tuple[dict[str, np.ndarray], dict[str, int]]:
-    """Read and validate live ESCO vectors from an existing Chroma collection."""
+    """Read and validate live ESCO vectors through the vector-store adapter."""
     live_ids = sorted(
         str(node_id)
         for node_id, data in graph.nodes(data=True)
