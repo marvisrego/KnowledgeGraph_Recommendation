@@ -510,8 +510,8 @@ Produces human-readable chains showing why each role was recommended.
 
 ### New dependencies
 
-- `lightgbm>=4.0` — link prediction model
-- `scikit-learn>=1.5` — cross-validation, metrics
+- `lightgbm>=4.0` — offline link-prediction training (`requirements-research.txt`)
+- `scikit-learn>=1.5` — offline cross-validation and metrics (`requirements-research.txt`)
 
 ### Test suite
 
@@ -530,7 +530,7 @@ EFFORT_WEIGHT_DOMAIN = 0.15
 EFFORT_WEIGHT_EMPIRICAL = 0.25
 EFFORT_WEIGHT_TRANSFERABILITY = 0.25
 LINK_PREDICTION_ENABLED = true
-LINK_PREDICTION_MODEL_PATH = artifacts/link_prediction/link_predictor.pkl
+LINK_PREDICTION_MODEL_PATH = artifacts/link_prediction/link_predictor.json
 ```
 
 ### New CLI flags (`build_graph.py`)
@@ -642,7 +642,8 @@ evaluation/
   benchmark_cases.json     Serialized dataset
 artifacts/
   link_prediction/
-    link_predictor.pkl     Trained LightGBM model
+    link_predictor.pkl     Offline trained LightGBM model
+    link_predictor.json    Portable runtime export for Vercel
     evaluation_report.json LP metrics
   retrieval_comparison/
     comparison_report.json 4-method Hits@K comparison
@@ -994,7 +995,7 @@ The GitHub `dev` branch is connected and deployed on Vercel. Required model/clou
 
 ### Final verification record
 
-- `python -m unittest discover -s tests -q`: 143 tests passed.
+- `python -m unittest discover -s tests -q`: 146 tests passed after the portability repair.
 - Python compilation, `node --check` for legacy browser scripts, and the React TypeScript/Vite production build passed.
 - `python -m pip check`: no broken requirements.
 - A real cloud-backed `/api/status` cold request returned HTTP 200 with Aura, Qdrant, transition smoothing, and link prediction loaded; reported counts were 19,241 nodes and 240,906 relationships.
@@ -1008,3 +1009,12 @@ The GitHub `dev` branch is connected and deployed on Vercel. Required model/clou
 - Qdrant Cloud connection: complete and validated with 3,932 vectors at 3,072 dimensions.
 - Runtime database loading: validated with Aura, Qdrant, transition smoothing, and link prediction all reporting ready.
 - Secrets remain outside Git and are supplied through Vercel environment variables.
+
+### Post-deployment response-rendering and LP portability fix
+
+1. Reproduced the deployed black screen and verified that AuraDB, Qdrant, and `/api/chat` remained healthy.
+2. Identified the frontend contract mismatch: `path.roles[*].have/need` contained `{id, title}` skill objects, but the React components treated them as strings.
+3. Added API-boundary normalization for mixed skill shapes and backend explanation aliases, plus an application error boundary with a visible reload action.
+4. Exported the existing LightGBM Booster to JSON and added dependency-free NumPy inference for Vercel. A configured legacy `.pkl` path falls back automatically to the sibling JSON artifact.
+5. Moved LightGBM and scikit-learn from runtime requirements to research requirements; the trained model and ranking behavior remain enabled.
+6. A cloud-backed Flask status smoke test with LightGBM imports deliberately blocked returned HTTP 200 with AuraDB, Qdrant, transition smoothing, and portable link prediction loaded.

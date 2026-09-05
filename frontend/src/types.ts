@@ -24,6 +24,19 @@ export interface Role {
   required_skill_count?: number
 }
 
+export interface SkillReference {
+  id?: string
+  title?: string
+  name?: string
+}
+
+export type ApiSkill = string | SkillReference
+
+export interface ApiRole extends Omit<Role, "have" | "need"> {
+  have?: ApiSkill[]
+  need?: ApiSkill[]
+}
+
 export interface SkillGapEntry {
   role_id: string
   role_title: string
@@ -65,10 +78,21 @@ export interface ExplanationStep {
   attrs?: Record<string, unknown>
 }
 
+export interface ApiExplanationStep extends Partial<ExplanationStep> {
+  source?: string
+  target?: string
+  attributes?: Record<string, unknown>
+}
+
 export interface Explanation {
   source_role: string
   target_role: string
   steps: ExplanationStep[]
+}
+
+export interface ApiExplanation extends Partial<Omit<Explanation, "steps">> {
+  role_title?: string
+  steps?: ApiExplanationStep[]
 }
 
 export interface Faithfulness {

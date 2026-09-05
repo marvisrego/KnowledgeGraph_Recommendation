@@ -3,7 +3,7 @@
   "functions": {
     "app.py": {
       "maxDuration": 300,
-      "includeFiles": "{templates/**,public/**,public_react/**,artifacts/link_prediction/link_predictor.pkl}",
+      "includeFiles": "{templates/**,public/**,public_react/**,artifacts/link_prediction/link_predictor.json}",
       "excludeFiles": "{.venv/**,venv/**,__pycache__/**,Data/**,docs/**,evaluation/**,tests/**,.agents/**,.claude/**,.antigravitycli/**,graph/**,index/**}"
     }
   }

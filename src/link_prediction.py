@@ -638,5 +638,13 @@ def save_model(model: object, path: Path) -> None:
 
 def load_model(path: Path) -> object:
     """Load trained model from disk."""
+    path = Path(path)
+    portable_path = path.with_suffix(".json")
+    if path.suffix.lower() in {".pkl", ".pickle"} and portable_path.is_file():
+        path = portable_path
+    if path.suffix.lower() == ".json":
+        from src.portable_lightgbm import PortableLightGBMBooster
+
+        return PortableLightGBMBooster.from_file(path)
     with open(path, "rb") as f:
         return pickle.load(f)

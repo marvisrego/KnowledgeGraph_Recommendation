@@ -8,7 +8,7 @@ Data/
 artifacts/*
 !artifacts/link_prediction/
 artifacts/link_prediction/*
-!artifacts/link_prediction/link_predictor.pkl
+!artifacts/link_prediction/link_predictor.json
 models/
 docs/
 evaluation/

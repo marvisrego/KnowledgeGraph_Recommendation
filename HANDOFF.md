@@ -161,7 +161,7 @@ TRANSITION_SMOOTHING_DIRECT_WEIGHT = 0.91
 TRANSITION_SMOOTHING_TEMPERATURE = 0.06
 KARRIEREWEGE_MAX_INVALID_ROW_RATIO = 0.001
 LINK_PREDICTION_ENABLED = true
-LINK_PREDICTION_MODEL_PATH = artifacts/link_prediction/link_predictor.pkl
+LINK_PREDICTION_MODEL_PATH = artifacts/link_prediction/link_predictor.json
 USE_LANGGRAPH = false
 ```
 
@@ -471,7 +471,7 @@ The supervisor requested: (1) a metric to measure effort/difficulty of career tr
 
 1. **Transition Effort Score (TES)** — `src/transition_effort.py`. Multi-factor composite: `TES = w1*SkillGapMagnitude + w2*DomainDistance + w3*(1-EmpiricalSupport) + w4*(1-Transferability)`. IDF-weighted skill gap measures rare vs common skill difficulty. ISCO Jaccard distance measures cross-domain difficulty. Empirical support uses TRANSITIONS_TO edges + smoother. Transferability measures IDF-weighted shared skills. Effort bands: Low (0–0.3), Moderate (0.3–0.6), High (0.6–1.0). Integrated into `inference_pipeline.py` — effort badges displayed on career-path role cards.
 
-2. **KG Link Prediction** — `src/link_prediction.py`, `evaluation/evaluate_link_prediction.py`. 9 graph-structural features (Common Neighbours, Jaccard, Adamic-Adar, Resource Allocation, Preferential Attachment, Embedding Cosine Sim, Same ISCO Group, IDF Skill Overlap, Neighbour Evidence). LightGBM classifier trained on 18,907 positive + 94,535 negative samples. **5-fold CV AUC: 0.9344, AP: 0.8186**. Top features: Neighbour Evidence (426K gain), Embedding Cosine Sim (44K). Model saved: `artifacts/link_prediction/link_predictor.pkl`. Source coverage: 100%.
+2. **KG Link Prediction** — `src/link_prediction.py`, `evaluation/evaluate_link_prediction.py`. 9 graph-structural features (Common Neighbours, Jaccard, Adamic-Adar, Resource Allocation, Preferential Attachment, Embedding Cosine Sim, Same ISCO Group, IDF Skill Overlap, Neighbour Evidence). LightGBM classifier trained on 18,907 positive + 94,535 negative samples. **5-fold CV AUC: 0.9344, AP: 0.8186**. Top features: Neighbour Evidence (426K gain), Embedding Cosine Sim (44K). Offline model: `artifacts/link_prediction/link_predictor.pkl`; portable deployment export: `artifacts/link_prediction/link_predictor.json`. Source coverage: 100%.
 
 3. **Graph-Provenance Faithfulness Verification** — `src/faithfulness.py`. Extracts bolded plus unbolded role/skill candidates, resolves normalized graph labels and safe short aliases such as parenthetical skill names, then checks BFS reachability within 3 hops. Score = |matched & reachable| / |total entities|.
 
@@ -490,7 +490,7 @@ EFFORT_WEIGHT_DOMAIN = 0.15
 EFFORT_WEIGHT_EMPIRICAL = 0.25
 EFFORT_WEIGHT_TRANSFERABILITY = 0.25
 LINK_PREDICTION_ENABLED = true
-LINK_PREDICTION_MODEL_PATH = artifacts/link_prediction/link_predictor.pkl
+LINK_PREDICTION_MODEL_PATH = artifacts/link_prediction/link_predictor.json
 ```
 
 ### New CLI flags
@@ -601,3 +601,12 @@ This section records the August 15 checkpoints. The current 2026-08-27 metrics, 
 6. **Failure behavior** — disabled smoothing, missing vectors, incompatible Qdrant data, or scorer errors fall back to the original direct transition expansion.
 7. **Vector scope** — 3,039/3,039 live ESCO vectors loaded in evaluation; runtime preloads only 765 transition-source vectors and caches per-role rankings. No embedding API call or raw person-level embedding is used.
 8. **Verification** — 28 offline tests pass; a mocked `/api/chat` request initialized the real-vector smoother, returned a ranked result, and exposed no smoothing error without calling external models.
+
+---
+
+## Post-deployment repair (2026-09-05)
+
+- The deployed `/api/chat` endpoint was healthy, but ESCO skills arrived as `{id, title}` objects while the React role cards expected strings. `frontend/src/lib/normalizeChatResponse.ts` now normalizes those values and the explanation-field aliases at the API boundary.
+- `AppErrorBoundary` prevents an unexpected result payload from blanking the entire application and provides a reload recovery action.
+- Link prediction now loads the existing trained ensemble from `artifacts/link_prediction/link_predictor.json` through a NumPy-based evaluator. Its predictions were verified exactly equal to the original LightGBM Booster on a 100-row numerical comparison.
+- Vercel no longer installs native LightGBM/scikit-learn packages. They remain in `requirements-research.txt` for offline training and evaluation. An existing Vercel value ending in `.pkl` automatically resolves to the sibling JSON model, so older environment configuration remains compatible.

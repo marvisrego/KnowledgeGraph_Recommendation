@@ -208,6 +208,10 @@ def build_link_prediction_runtime(
     from src.transition_embedding import compute_neighbour_index, load_live_esco_embeddings
 
     model_path = Path(model_path)
+    if not model_path.is_file() and model_path.suffix.lower() in {".pkl", ".pickle"}:
+        portable_path = model_path.with_suffix(".json")
+        if portable_path.is_file():
+            model_path = portable_path
     if not model_path.is_file():
         raise RuntimeError(f"Link-prediction model not found: {model_path}")
 
