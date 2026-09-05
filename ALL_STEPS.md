@@ -1042,3 +1042,4 @@ The GitHub `dev` branch is connected and deployed on Vercel. Required model/clou
 9. The cloud run produced AUC `0.883507`, AP `0.702902`, Hits@1 `0.713725`, Hits@3 `0.853595`, Hits@5 `0.911111`, Hits@10 `0.949020`, and MRR `0.797201`; every configured publication gate passed.
 10. The workflow opened PR #8 containing only the validated portable model. Its Vercel preview passed and the PR was merged into `dev` as `32ce418`.
 11. Final production smoke checks passed: the public React root returned HTTP 200, `/api/status` reported Aura/Qdrant/smoothing/link prediction ready with no error, and a representative `/api/chat` request returned HTTP 200 with a structured path payload.
+12. Updated `actions/checkout`, `actions/setup-python`, and `actions/upload-artifact` to their current v7 majors after the successful run reported Node.js 20 deprecation notices. No second full training run was consumed solely for this maintenance-only pin change.

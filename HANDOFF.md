@@ -622,6 +622,7 @@ This section records the August 15 checkpoints. The current 2026-08-27 metrics, 
 ### 2026-09-05 repository and Actions cleanup
 
 - Reduced the manual cloud-training job timeout from 180 to 30 minutes and candidate artifact retention from 30 to 7 days to stay lightweight on the GitHub Student/Pro allowance.
+- Pinned checkout, Python setup, and artifact upload to their current official v7 majors after the first run exposed Node.js 20 deprecation notices; this removes the obsolete action-runtime pins without adding another paid training run.
 - Removed the obsolete pickle model, vanilla chat template/assets, unused Vite starter images, unused component scaffolding, and their Radix/Cytoscape npm dependencies.
 - Moved the retained graph viewer CSS/JS into `frontend/public/`; Vite now copies them into `public_react/`, the single static root served by Flask and packaged by Vercel.
 - Removed generated local `graph/`, `index/`, cloud rebuild cache, cloud smoke output, and the accidental workspace `~/` directory. The hosted Aura/Qdrant databases remain authoritative, and the generated caches can be recreated.
