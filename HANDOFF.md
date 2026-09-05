@@ -12,7 +12,7 @@ GraphRAG career chatbot for a thesis. **React frontend + LangGraph 12-node pipel
 - **Vector database:** Qdrant Cloud, rebuilt and live with 3,932 role vectors at 3,072 dimensions
 - **Runtime:** Aura is loaded into a NetworkX compatibility snapshot; semantic retrieval runs against Qdrant
 - **Rebuild:** `python rebuild_databases.py` prepares, evaluates, rebuilds, and validates both dedicated cloud databases
-- **Vercel:** `app.py` entrypoint; the React build and LP model are bundled, while raw data and local graph/vector artifacts stay excluded
+- **Vercel:** deployment completed from `dev`; `app.py` serves the bundled React build and LP model, while raw data and local graph/vector artifacts stay excluded
 
 ### 2026-09-05 cloud migration result
 
@@ -23,6 +23,7 @@ GraphRAG career chatbot for a thesis. **React frontend + LangGraph 12-node pipel
 - The accepted smoother remains the production ranker. Link prediction is scored and returned only as virtual missing-edge evidence; predictions are never persisted as observed transitions.
 - Live validation passed: Aura counts and round-trip NetworkX counts both equal 19,241/240,906; Qdrant count is 3,932 and sample similarity search succeeded.
 - Held-out test: Hits@1 `0.148318`, Hits@3 `0.285743`, Hits@5 `0.372281`, Hits@10 `0.505858`, MRR `0.261803`, source coverage `1.000000`.
+- Vercel deployment is complete and the production configuration uses the external Aura and Qdrant connections. Database credentials remain environment-only and are not stored in Git.
 
 ### Implemented Novelty Contributions
 
@@ -58,7 +59,7 @@ The 2026-08-27 comparison selects the validation-accepted smoothed ranking: test
 - `.venv` now satisfies `requirements.txt`; LangGraph/LangChain are capped below `1.0` to avoid the local `langchain 0.3.x` conflict.
 - Verified after the cloud migration: 143 unit tests pass; Python compilation, frontend production build, JavaScript syntax, and `pip check` pass. A real cold `/api/status` request returned HTTP 200 with Aura, Qdrant, smoothing, and link prediction all loaded.
 
-The external data layer is now deployment-ready. Vercel still requires all variables from the cloud/model sections of `.env.example` to be configured as project environment variables; `.env` itself must never be committed.
+The external data layer and Vercel deployment are complete. Required cloud/model values are configured through Vercel environment variables; `.env` itself remains uncommitted.
 
 ---
 

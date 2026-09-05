@@ -990,7 +990,7 @@ The rebuilt graph/vector result matches the accepted local method within roughly
 
 `vercel.json` packages `templates/`, legacy `public/`, the committed `public_react/` production build, and the small LP model. It excludes raw datasets, local graph/index directories, tests, evaluation outputs, and agent tooling. ChromaDB was removed from runtime dependencies. The Python function duration is set to 300 seconds for cloud-backed cold starts and model calls.
 
-Before connecting the GitHub `dev` branch to Vercel, configure every required model/cloud value from `.env.example` in Vercel Project Settings. Never commit `.env`. The database rebuild is an offline administration command and must not be run during a Vercel build or request.
+The GitHub `dev` branch is connected and deployed on Vercel. Required model/cloud values are supplied through Vercel Project Settings and `.env` remains uncommitted. The database rebuild is an offline administration command and must not be run during a Vercel build or request.
 
 ### Final verification record
 
@@ -999,4 +999,12 @@ Before connecting the GitHub `dev` branch to Vercel, configure every required mo
 - `python -m pip check`: no broken requirements.
 - A real cloud-backed `/api/status` cold request returned HTTP 200 with Aura, Qdrant, transition smoothing, and link prediction loaded; reported counts were 19,241 nodes and 240,906 relationships.
 - A natural-language query for `machine learning engineer` was embedded with the configured model and returned relevant Qdrant matches led by artificial intelligence engineer, data engineer, and data scientist.
-- `vercel.json` parses successfully. Vercel CLI `59.11.7` was available, but its account-bound `deploy --dry` manifest refused to run without Vercel login; no temporary deployment was created.
+- `vercel.json` parses successfully. The earlier local CLI dry-run check was account-blocked, but deployment was subsequently completed through Vercel using the GitHub `dev` branch.
+
+### Deployment completion
+
+- Vercel deployment: complete from the repository's `dev` branch.
+- Neo4j AuraDB connection: complete and validated with 19,241 nodes and 240,906 relationships.
+- Qdrant Cloud connection: complete and validated with 3,932 vectors at 3,072 dimensions.
+- Runtime database loading: validated with Aura, Qdrant, transition smoothing, and link prediction all reporting ready.
+- Secrets remain outside Git and are supplied through Vercel environment variables.
