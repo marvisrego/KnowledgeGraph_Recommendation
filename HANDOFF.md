@@ -626,4 +626,5 @@ This section records the August 15 checkpoints. The current 2026-08-27 metrics, 
 - Moved the retained graph viewer CSS/JS into `frontend/public/`; Vite now copies them into `public_react/`, the single static root served by Flask and packaged by Vercel.
 - Removed generated local `graph/`, `index/`, cloud rebuild cache, cloud smoke output, and the accidental workspace `~/` directory. The hosted Aura/Qdrant databases remain authoritative, and the generated caches can be recreated.
 - Preserved ignored `Data/` source files because they are still required by `rebuild_databases.py` for a complete from-source rebuild.
-- The remaining delivery sequence is to merge `dev` into default `main`, run the workflow against `dev`, and merge its validated model PR if the promotion gates pass.
+- Delivery completed: PR #7 merged the workflow and deployment cleanup into `main`; Actions run `33975475939` completed successfully in 2m57s; its validated model PR #8 passed Vercel preview and was merged into `dev` as `32ce418`.
+- First GitHub-hosted result: AUC `0.883507`, AP `0.702902`, Hits@1 `0.713725`, Hits@3 `0.853595`, Hits@5 `0.911111`, Hits@10 `0.949020`, and MRR `0.797201`. These source-grouped sampled-negative metrics passed every publication gate and remain separate from the official held-out Karrierewege benchmark.
