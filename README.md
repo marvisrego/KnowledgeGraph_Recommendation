@@ -77,10 +77,10 @@ Structured Career Recommendation
 | Embeddings | Azure OpenAI text-embedding-3-large |
 | Reranker | Cohere rerank-v4.0-pro |
 | LLM | Azure OpenAI gpt-5.4-nano (Responses API) |
-| Link Prediction | LightGBM (bundled 9-feature model; 11-feature extractor for future retraining) |
+| Link Prediction | LightGBM cloud training; portable JSON/NumPy inference on Vercel |
 | Agent Orchestration | LangGraph StateGraph (12 nodes) |
 | Backend | Flask (Python 3.13) |
-| Frontend | React 19 + Vite + shadcn/ui + Tailwind CSS v4 + Framer Motion |
+| Frontend | React 19 + Vite + Tailwind CSS v4 + Framer Motion |
 
 ## Run Locally
 
@@ -112,6 +112,30 @@ Structured Career Recommendation
 > **Frontend dev mode** (hot reload): `cd frontend && npm run dev` — proxies `/api/*` to Flask on port 8001.
 
 Local and deployed inference read the graph from Neo4j AuraDB and vectors from Qdrant Cloud. The same embedding model is used for indexing and query-time retrieval. The small trained LP model is bundled, while raw datasets and generated graph/vector stores remain excluded from deployment.
+
+## Train link prediction fully online
+
+GitHub Actions supplies the temporary Linux training computer; Vercel continues to host the application. GitHub Pages is not used because it cannot run the Flask API.
+
+The manual workflow at `.github/workflows/train-link-prediction.yml` reconstructs the production graph from AuraDB, reads existing ESCO vectors from Qdrant, trains LightGBM with source-role-disjoint folds, removes held-out-source transitions from neighbour-evidence features, and reports AUC, average precision, Hits@1/3/5/10, MRR, and NDCG. A candidate must pass all configured gates before the workflow can create a model-update pull request.
+
+Configure these GitHub Actions repository secrets:
+
+- `KG_URI`
+- `KG_USER`
+- `KG_PASS`
+- `KG_ID`
+- `VECTOR_ENDPOINT`
+- `VECTOR_PASS`
+- `NEO4J_DATABASE` only when using a non-default database
+
+Optionally set the repository variable `QDRANT_COLLECTION`; it defaults to `career_roles`. The workflow does not require chat, embedding, or reranking API keys because it reuses vectors already stored in Qdrant.
+
+Because the repository default branch is `main`, the workflow must exist on `main` for GitHub to display its manual **Run workflow** button. Run it with `target_branch=dev` and pull-request publishing enabled; after review, merge the generated model PR so Vercel builds the updated portable model from `dev`.
+
+The repository is configured with all six required cloud secrets, `QDRANT_COLLECTION=career_roles`, read/write workflow permissions, and permission for Actions to create pull requests. `NEO4J_DATABASE` remains optional. The workflow requests only `contents: write` and `pull-requests: write`; it runs only when manually started.
+
+The workflow uploads the candidate model and redacted metrics as a 7-day Actions artifact. Its job timeout is 30 minutes, it never writes predicted relationships to AuraDB, and it does not expose endpoint or credential values in the report.
 
 ## Rebuild the cloud databases
 
@@ -151,6 +175,7 @@ Set the variables for Preview and Production in Vercel before deploying. Do not 
 ```
 app.py                      Vercel entry point
 career_kg_web.py            Flask server (port 8001)
+train_link_prediction_cloud.py  Aura/Qdrant cloud training entry point
 config.py                   Environment-based settings
 coursera_client.py          Course search integration
 
@@ -160,6 +185,7 @@ src/
   transition_embedding.py   Semantic-neighbour smoothing
   transition_effort.py      Transition Effort Score (TES) + upskill time estimate
   link_prediction.py        LightGBM predictor with model-declared feature compatibility
+  portable_lightgbm.py      Dependency-free JSON model inference for Vercel
   kg_enrichment.py          Skill IDF + ISCO codes
   isco_edges.py             SAME_ISCO_GROUP structural edges
   faithfulness.py           Graph-provenance verification
@@ -190,7 +216,7 @@ agents/
     faithfulness_node.py    Post-generation verification
     explanation.py          Evidence chain tracing
 
-frontend/                   React 19 + Vite + shadcn/ui + Tailwind v4
+frontend/                   React 19 + Vite + Tailwind v4
   src/
     components/
       ChatShell.tsx         Main chat layout + message rendering

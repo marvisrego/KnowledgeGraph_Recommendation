@@ -510,8 +510,8 @@ Produces human-readable chains showing why each role was recommended.
 
 ### New dependencies
 
-- `lightgbm>=4.0` — link prediction model
-- `scikit-learn>=1.5` — cross-validation, metrics
+- `lightgbm>=4.0` — offline link-prediction training (`requirements-research.txt`)
+- `scikit-learn>=1.5` — offline cross-validation and metrics (`requirements-research.txt`)
 
 ### Test suite
 
@@ -530,7 +530,7 @@ EFFORT_WEIGHT_DOMAIN = 0.15
 EFFORT_WEIGHT_EMPIRICAL = 0.25
 EFFORT_WEIGHT_TRANSFERABILITY = 0.25
 LINK_PREDICTION_ENABLED = true
-LINK_PREDICTION_MODEL_PATH = artifacts/link_prediction/link_predictor.pkl
+LINK_PREDICTION_MODEL_PATH = artifacts/link_prediction/link_predictor.json
 ```
 
 ### New CLI flags (`build_graph.py`)
@@ -642,7 +642,8 @@ evaluation/
   benchmark_cases.json     Serialized dataset
 artifacts/
   link_prediction/
-    link_predictor.pkl     Trained LightGBM model
+    link_predictor.pkl     Offline trained LightGBM model
+    link_predictor.json    Portable runtime export for Vercel
     evaluation_report.json LP metrics
   retrieval_comparison/
     comparison_report.json 4-method Hits@K comparison
@@ -988,15 +989,51 @@ The rebuilt graph/vector result matches the accepted local method within roughly
 
 `career_kg_web.py` now lazy-loads the graph from Aura and vectors from Qdrant. The Qdrant adapter preserves the retrieval interface used by the classic and LangGraph pipelines, so query text is embedded with the same model and searched remotely without changing downstream ranking semantics.
 
-`vercel.json` packages `templates/`, legacy `public/`, the committed `public_react/` production build, and the small LP model. It excludes raw datasets, local graph/index directories, tests, evaluation outputs, and agent tooling. ChromaDB was removed from runtime dependencies. The Python function duration is set to 300 seconds for cloud-backed cold starts and model calls.
+`vercel.json` packages `templates/`, the committed `public_react/` production build, and the small portable LP model. It excludes raw datasets, local graph/index directories, tests, evaluation outputs, and agent tooling. ChromaDB was removed from runtime dependencies. The Python function duration is set to 300 seconds for cloud-backed cold starts and model calls.
 
-Before connecting the GitHub `dev` branch to Vercel, configure every required model/cloud value from `.env.example` in Vercel Project Settings. Never commit `.env`. The database rebuild is an offline administration command and must not be run during a Vercel build or request.
+The GitHub `dev` branch is connected and deployed on Vercel. Required model/cloud values are supplied through Vercel Project Settings and `.env` remains uncommitted. The database rebuild is an offline administration command and must not be run during a Vercel build or request.
 
 ### Final verification record
 
-- `python -m unittest discover -s tests -q`: 143 tests passed.
+- `python -m unittest discover -s tests -q`: 150 tests passed after the cloud-training automation.
 - Python compilation, `node --check` for legacy browser scripts, and the React TypeScript/Vite production build passed.
 - `python -m pip check`: no broken requirements.
 - A real cloud-backed `/api/status` cold request returned HTTP 200 with Aura, Qdrant, transition smoothing, and link prediction loaded; reported counts were 19,241 nodes and 240,906 relationships.
 - A natural-language query for `machine learning engineer` was embedded with the configured model and returned relevant Qdrant matches led by artificial intelligence engineer, data engineer, and data scientist.
-- `vercel.json` parses successfully. Vercel CLI `59.11.7` was available, but its account-bound `deploy --dry` manifest refused to run without Vercel login; no temporary deployment was created.
+- `vercel.json` parses successfully. The earlier local CLI dry-run check was account-blocked, but deployment was subsequently completed through Vercel using the GitHub `dev` branch.
+
+### Deployment completion
+
+- Vercel deployment: complete from the repository's `dev` branch.
+- Neo4j AuraDB connection: complete and validated with 19,241 nodes and 240,906 relationships.
+- Qdrant Cloud connection: complete and validated with 3,932 vectors at 3,072 dimensions.
+- Runtime database loading: validated with Aura, Qdrant, transition smoothing, and link prediction all reporting ready.
+- Secrets remain outside Git and are supplied through Vercel environment variables.
+
+### Post-deployment response-rendering and LP portability fix
+
+1. Reproduced the deployed black screen and verified that AuraDB, Qdrant, and `/api/chat` remained healthy.
+2. Identified the frontend contract mismatch: `path.roles[*].have/need` contained `{id, title}` skill objects, but the React components treated them as strings.
+3. Added API-boundary normalization for mixed skill shapes and backend explanation aliases, plus an application error boundary with a visible reload action.
+4. Exported the existing LightGBM Booster to JSON and added dependency-free NumPy inference for Vercel. A configured legacy `.pkl` path falls back automatically to the sibling JSON artifact.
+5. Moved LightGBM and scikit-learn from runtime requirements to research requirements; the trained model and ranking behavior remain enabled.
+6. A cloud-backed Flask status smoke test with LightGBM imports deliberately blocked returned HTTP 200 with AuraDB, Qdrant, transition smoothing, and portable link prediction loaded.
+
+### Fully online link-prediction retraining
+
+1. Added `train_link_prediction_cloud.py`, which reconstructs the production graph from AuraDB and loads all live ESCO vectors from Qdrant without local datasets or embedding calls.
+2. Added source-role-disjoint GroupKFold validation. Held-out source transitions are removed from fold-specific neighbour-evidence features.
+3. Added classification and ranking promotion gates: AUC >= 0.87, AP >= 0.68, Hits@5 >= 0.89, and MRR >= 0.78.
+4. The production-data smoke run trained on 113,442 sampled pairs and passed with AUC 0.883384, AP 0.702746, Hits@5 0.912418, and MRR 0.801180. These internal sampled-negative metrics are not directly comparable to the official Karrierewege test split.
+5. Added `.github/workflows/train-link-prediction.yml`. A manual run installs training-only dependencies on Ubuntu, tests, trains, uploads a 7-day artifact, and optionally opens a validated model PR against `dev`.
+6. GitHub Pages is not used. Vercel remains the React/Flask deployment, while GitHub Actions supplies ephemeral training compute.
+7. Configured the six cloud credentials as GitHub Actions secrets, set `QDRANT_COLLECTION=career_roles`, and enabled Actions read/write plus pull-request creation. Secret values were not printed or committed. The workflow still needs to be merged into the default `main` branch before its first manual run.
+
+### GitHub/Vercel repository cleanup and delivery
+
+1. Reduced the manual trainer timeout from 180 to 30 minutes and artifact retention from 30 to 7 days, avoiding scheduled runs and unnecessary Student/Pro Actions usage.
+2. Removed the obsolete LightGBM pickle, legacy vanilla chat page, unused Vite starter assets, unused UI scaffolding, and unused Radix/Cytoscape packages.
+3. Kept the `/graph` viewer and moved its CSS/JS to `frontend/public/`; the Vite build copies both into `public_react/`, which is now Flask's only static root.
+4. Removed generated local graph/index stores, cloud preparation/smoke caches, and the accidental workspace `~/` directory after verifying every target was inside the repository workspace.
+5. Preserved ignored `Data/` because it is the only complete source input for `python rebuild_databases.py`; it remains excluded from Git and Vercel.
+6. Rebuilt the production frontend and verified the resulting `public_react/` bundle contains the SPA and graph-viewer assets.

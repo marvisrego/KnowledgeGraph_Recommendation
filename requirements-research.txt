@@ -1,4 +1,4 @@
--r requirements.txt
+-r requirements-training.txt
 
 # Offline dataset preprocessing and evaluation only.
 pandas==2.3.3

@@ -186,7 +186,7 @@ class Settings:
             effort_weight_transferability=float(os.getenv("EFFORT_WEIGHT_TRANSFERABILITY", "0.25")),
             # Link prediction
             link_prediction_enabled=_bool("LINK_PREDICTION_ENABLED", True),
-            link_prediction_model_path=_path("LINK_PREDICTION_MODEL_PATH", "artifacts/link_prediction/link_predictor.pkl"),
+            link_prediction_model_path=_path("LINK_PREDICTION_MODEL_PATH", "artifacts/link_prediction/link_predictor.json"),
             # Agent orchestration
             use_langgraph=_bool("USE_LANGGRAPH", True),
         )

@@ -1,4 +1,5 @@
 import type { ChatResponse, Message, StatusResponse } from "./types"
+import { normalizeChatResponse } from "./lib/normalizeChatResponse"
 
 const BASE = ""
 
@@ -19,7 +20,8 @@ export async function postChat(messages: Message[]): Promise<ChatResponse> {
     const err = await res.json().catch(() => ({ message: "Network error" }))
     throw new Error(err.message ?? `HTTP ${res.status}`)
   }
-  return res.json()
+  const response = await res.json() as ChatResponse
+  return normalizeChatResponse(response)
 }
 
 export async function getGraphData() {

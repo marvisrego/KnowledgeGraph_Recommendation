@@ -24,10 +24,15 @@ def create_app():
     render_template = flask.render_template
     request = flask.request
 
-    # Serve React build from public_react/ if it exists, else fall back to legacy public/
+    # Vercel serves the checked-in React build; frontend/public assets are copied
+    # into this directory by Vite so the graph viewer uses the same static root.
     _react_dist = Path(__file__).resolve().parent / "public_react"
-    _static_folder = str(_react_dist) if _react_dist.exists() else "public"
-    app = Flask(__name__, template_folder="templates", static_folder=_static_folder, static_url_path="")
+    app = Flask(
+        __name__,
+        template_folder="templates",
+        static_folder=str(_react_dist),
+        static_url_path="",
+    )
     app.config["JSON_SORT_KEYS"] = False
 
     settings = Settings.from_env(Path(__file__).resolve().parent)
@@ -112,10 +117,11 @@ def create_app():
 
     @app.get("/")
     def index():
-        # Serve React SPA if built, else legacy template
         if _react_dist.exists():
             return flask.send_from_directory(str(_react_dist), "index.html")
-        return render_template("index.html")
+        return jsonify({
+            "error": "Frontend build is missing. Run `npm run build` in frontend/.",
+        }), 503
 
     @app.get("/graph")
     def graph_view():
