@@ -1,0 +1,98 @@
+name: Train link-prediction model
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: Branch that should receive the model update PR
+        required: true
+        default: dev
+        type: string
+      publish_pull_request:
+        description: Create a pull request when validation passes
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: link-prediction-training
+  cancel-in-progress: false
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      KG_URI: ${{ secrets.KG_URI }}
+      KG_USER: ${{ secrets.KG_USER }}
+      KG_PASS: ${{ secrets.KG_PASS }}
+      KG_ID: ${{ secrets.KG_ID }}
+      NEO4J_DATABASE: ${{ secrets.NEO4J_DATABASE }}
+      VECTOR_ENDPOINT: ${{ secrets.VECTOR_ENDPOINT }}
+      VECTOR_PASS: ${{ secrets.VECTOR_PASS }}
+      QDRANT_COLLECTION: ${{ vars.QDRANT_COLLECTION || 'career_roles' }}
+
+    steps:
+      - name: Check out target branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_branch }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-training.txt
+
+      - name: Install native training runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libgomp1
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-training.txt
+
+      - name: Run focused trainer tests
+        run: python -m unittest tests.test_portable_lightgbm tests.test_cloud_link_training -v
+
+      - name: Train and validate from AuraDB and Qdrant
+        run: >-
+          python train_link_prediction_cloud.py
+          --output-dir artifacts/link_prediction/cloud_run
+          --model-output artifacts/link_prediction/cloud_run/link_predictor.json
+
+      - name: Upload model and metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: link-prediction-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/link_prediction/cloud_run/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Create validated model pull request
+        if: ${{ success() && inputs.publish_pull_request }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_BRANCH: ${{ inputs.target_branch }}
+        run: |
+          cp artifacts/link_prediction/cloud_run/link_predictor.json artifacts/link_prediction/link_predictor.json
+          update_branch="automation/link-prediction-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$update_branch"
+          git add -f -- artifacts/link_prediction/link_predictor.json
+          git commit -m "Update validated link-prediction model"
+          git push --set-upstream origin "$update_branch"
+          gh pr create \
+            --base "$TARGET_BRANCH" \
+            --head "$update_branch" \
+            --title "Update validated link-prediction model" \
+            --body "Cloud training passed the source-grouped validation gates. Metrics and the candidate model are attached to GitHub Actions run ${GITHUB_RUN_ID}."

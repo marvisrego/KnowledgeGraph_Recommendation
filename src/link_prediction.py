@@ -11,14 +11,17 @@ Features per (source, target) role pair:
 4. Resource Allocation Index (shared skills weighted by inverse degree)
 5. Preferential Attachment (product of skill counts)
 6. Embedding Cosine Similarity (from stored role vectors)
-7. Same ISCO Group (binary)
+7. ISCO Group Distance
 8. IDF-weighted Skill Overlap (rare skills matter more)
 9. Neighbour Transition Evidence (do semantically similar roles transition here?)
+10. Role-title TF-IDF Similarity
+11. Shared Skill Meta-path Count
 """
 
 from __future__ import annotations
 
 import math
+import json
 import pickle
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -81,7 +84,7 @@ def extract_pair_features(
     transition_index: dict[str, dict[str, float]] | None = None,
     neighbour_roles: dict[str, list[str]] | None = None,
 ) -> np.ndarray:
-    """Extract 9-dimensional feature vector for a (source, target) role pair."""
+    """Extract an 11-dimensional feature vector for a role pair."""
     if idf_map is None:
         idf_map = _get_idf(G)
 
@@ -634,6 +637,20 @@ def save_model(model: object, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "wb") as f:
         pickle.dump(model, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+def save_portable_model(model: object, path: Path) -> None:
+    """Atomically export a trained LightGBM Booster for dependency-free inference."""
+    dump_model = getattr(model, "dump_model", None)
+    if not callable(dump_model):
+        raise TypeError("Model does not provide LightGBM dump_model()")
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = path.with_suffix(f"{path.suffix}.tmp")
+    with temporary_path.open("w", encoding="utf-8") as model_file:
+        json.dump(dump_model(), model_file, separators=(",", ":"))
+    temporary_path.replace(path)
 
 
 def load_model(path: Path) -> object:

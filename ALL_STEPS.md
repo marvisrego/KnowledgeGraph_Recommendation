@@ -995,7 +995,7 @@ The GitHub `dev` branch is connected and deployed on Vercel. Required model/clou
 
 ### Final verification record
 
-- `python -m unittest discover -s tests -q`: 146 tests passed after the portability repair.
+- `python -m unittest discover -s tests -q`: 150 tests passed after the cloud-training automation.
 - Python compilation, `node --check` for legacy browser scripts, and the React TypeScript/Vite production build passed.
 - `python -m pip check`: no broken requirements.
 - A real cloud-backed `/api/status` cold request returned HTTP 200 with Aura, Qdrant, transition smoothing, and link prediction loaded; reported counts were 19,241 nodes and 240,906 relationships.
@@ -1018,3 +1018,13 @@ The GitHub `dev` branch is connected and deployed on Vercel. Required model/clou
 4. Exported the existing LightGBM Booster to JSON and added dependency-free NumPy inference for Vercel. A configured legacy `.pkl` path falls back automatically to the sibling JSON artifact.
 5. Moved LightGBM and scikit-learn from runtime requirements to research requirements; the trained model and ranking behavior remain enabled.
 6. A cloud-backed Flask status smoke test with LightGBM imports deliberately blocked returned HTTP 200 with AuraDB, Qdrant, transition smoothing, and portable link prediction loaded.
+
+### Fully online link-prediction retraining
+
+1. Added `train_link_prediction_cloud.py`, which reconstructs the production graph from AuraDB and loads all live ESCO vectors from Qdrant without local datasets or embedding calls.
+2. Added source-role-disjoint GroupKFold validation. Held-out source transitions are removed from fold-specific neighbour-evidence features.
+3. Added classification and ranking promotion gates: AUC >= 0.87, AP >= 0.68, Hits@5 >= 0.89, and MRR >= 0.78.
+4. The production-data smoke run trained on 113,442 sampled pairs and passed with AUC 0.883384, AP 0.702746, Hits@5 0.912418, and MRR 0.801180. These internal sampled-negative metrics are not directly comparable to the official Karrierewege test split.
+5. Added `.github/workflows/train-link-prediction.yml`. A manual run installs training-only dependencies on Ubuntu, tests, trains, uploads a 30-day artifact, and optionally opens a validated model PR against `dev`.
+6. GitHub Pages is not used. Vercel remains the React/Flask deployment, while GitHub Actions supplies ephemeral training compute.
+7. Before the first run, add the six cloud credentials as GitHub Actions secrets, enable Actions read/write and pull-request creation, and merge the workflow into the default `main` branch so the manual Run workflow button becomes available.

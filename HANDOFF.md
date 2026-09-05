@@ -610,3 +610,13 @@ This section records the August 15 checkpoints. The current 2026-08-27 metrics, 
 - `AppErrorBoundary` prevents an unexpected result payload from blanking the entire application and provides a reload recovery action.
 - Link prediction now loads the existing trained ensemble from `artifacts/link_prediction/link_predictor.json` through a NumPy-based evaluator. Its predictions were verified exactly equal to the original LightGBM Booster on a 100-row numerical comparison.
 - Vercel no longer installs native LightGBM/scikit-learn packages. They remain in `requirements-research.txt` for offline training and evaluation. An existing Vercel value ending in `.pkl` automatically resolves to the sibling JSON model, so older environment configuration remains compatible.
+
+### Fully online link-prediction training (2026-09-05)
+
+- `.github/workflows/train-link-prediction.yml` provides a manual GitHub Actions job; GitHub Pages is not part of the architecture and Vercel remains the web/API host.
+- `train_link_prediction_cloud.py` loads the graph read-only from AuraDB and existing ESCO vectors from Qdrant, so no local graph, Chroma store, raw dataset, or embedding API call is required.
+- Validation uses source-role-disjoint GroupKFold and excludes held-out source transitions from the neighbour-evidence feature. It reports classification and ranking metrics and refuses publication below AUC 0.87, AP 0.68, Hits@5 0.89, or MRR 0.78.
+- The verified cloud-data smoke run used 113,442 pairs (18,907 positive) and produced AUC 0.883384, AP 0.702746, Hits@1 0.718954, Hits@3 0.857516, Hits@5 0.912418, Hits@10 0.950327, and MRR 0.801180. These sampled-negative source-grouped diagnostics are a promotion gate, not a replacement for the separate Karrierewege held-out benchmark.
+- An accepted run exports a portable model, uploads the model/report as a GitHub artifact, and can open a model-update PR against `dev`. It never writes predicted edges to AuraDB.
+- Required Actions secrets are `KG_URI`, `KG_USER`, `KG_PASS`, `KG_ID`, `VECTOR_ENDPOINT`, and `VECTOR_PASS`; `NEO4J_DATABASE` is optional and `QDRANT_COLLECTION` is an optional repository variable.
+- The full verification suite is now 150 tests. GitHub currently has no Actions secrets or repository variables configured, so the owner must add them and allow Actions to create pull requests before the first run.

@@ -28,6 +28,10 @@ index/
 add_toc.py
 build_graph.py
 build_vercel_bundle.py
+train_link_prediction_cloud.py
+requirements-research.txt
+requirements-training.txt
+.github/
 career_kg_chat.py
 coursera_api_check.py
 test_apis.py
