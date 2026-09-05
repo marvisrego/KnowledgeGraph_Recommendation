@@ -26,12 +26,12 @@ Structured Career Recommendation
 
 ## Key Features
 
-- **Knowledge Graph**: 19,225 nodes, 224,711 edges spanning ONET + ESCO taxonomies with 18,907 empirical career transition edges
+- **Knowledge Graph**: 19,241 nodes and 240,906 relationships in Neo4j AuraDB, spanning ONET + ESCO with 18,907 train-only career transition edges
 - **Transition Effort Score (TES)**: Multi-factor difficulty metric (IDF-weighted skill gap, ISCO domain distance, empirical support, transferability) — displayed as percentage with upskill time estimate
 - **Qualification Scoring**: IDF-weighted fraction of essential skills the user already has per target role
 - **Skill Gap Analysis**: Per-role ranked missing skills by TES reduction impact, quick wins, and blockers
 - **Learning Roadmap**: Phased upskill plan with Coursera course groupings and week estimates
-- **Link Prediction**: LightGBM with 11 graph-structural features (CV AUC 0.9344) exposed as clearly labeled virtual missing-edge backfill
+- **Link Prediction**: LightGBM over structural, semantic, transition, ISCO, and skill features, exposed only as scored virtual missing-edge backfill
 - **Faithfulness Verification**: Post-generation check showing verified/unreachable/unmatched entities with percentage score
 - **Explanation Chains**: Typed-edge evidence paths (TRANSITIONS\_TO, SIMILAR\_TO, REQUIRES) per recommendation
 - **Hybrid Retrieval**: Vector search + accepted transition smoothing + role-relevant graph overlap, with LP coverage backfill
@@ -43,7 +43,7 @@ Structured Career Recommendation
 | Step | Component | Method |
 |------|-----------|--------|
 | 1 | Intent Routing | LLM classifies user type, extracts skills/role/goal |
-| 2 | Retrieval | RRF over Chroma, direct/smoothed transitions, IDF skill overlap; LP missing-edge backfill |
+| 2 | Retrieval | RRF over Qdrant, direct/smoothed transitions, IDF skill overlap; LP missing-edge backfill |
 | 3 | Reranking | Cohere rerank-v4.0-pro → top-8 candidates |
 | 4 | Qualification | IDF-weighted % of essential skills owned per candidate |
 | 5 | Graph Traversal | REQUIRES, SIMILAR\_TO, observed and explicitly inferred transition triples |
@@ -57,11 +57,10 @@ Structured Career Recommendation
 
 ## Evaluation Results
 
-| Method | Hits@5 | Hits@10 | MRR | Coverage |
-|--------|--------|---------|-----|----------|
-| Direct edges (baseline) | 0.3702 | 0.5014 | 0.2591 | 73.9% |
-| Accepted embedding smoothing | 0.3722 | 0.5058 | 0.2617 | **100%** |
-| Combined priority fallback | 0.3722 | 0.5058 | 0.2617 | **100%** |
+| Method | Hits@1 | Hits@3 | Hits@5 | Hits@10 | MRR | Source coverage |
+|--------|--------|--------|--------|---------|-----|-----------------|
+| Direct edges (cloud rebuild baseline) | 0.1478 | 0.2850 | 0.3702 | 0.5014 | 0.2591 | 73.9% |
+| Accepted embedding smoothing | **0.1483** | **0.2857** | **0.3723** | **0.5059** | **0.2618** | **100%** |
 
 | Model | Metric | Value |
 |-------|--------|-------|
@@ -73,12 +72,12 @@ Structured Career Recommendation
 
 | Layer | Technology |
 |-------|-----------|
-| Knowledge Graph | NetworkX MultiDiGraph |
-| Vector Store | ChromaDB |
+| Knowledge Graph | Neo4j AuraDB, loaded as a NetworkX MultiDiGraph snapshot at runtime |
+| Vector Store | Qdrant Cloud (cosine, 3,932 role vectors) |
 | Embeddings | Azure OpenAI text-embedding-3-large |
 | Reranker | Cohere rerank-v4.0-pro |
 | LLM | Azure OpenAI gpt-5.4-nano (Responses API) |
-| Link Prediction | LightGBM (11 features) |
+| Link Prediction | LightGBM (bundled 9-feature model; 11-feature extractor for future retraining) |
 | Agent Orchestration | LangGraph StateGraph (12 nodes) |
 | Backend | Flask (Python 3.13) |
 | Frontend | React 19 + Vite + shadcn/ui + Tailwind CSS v4 + Framer Motion |
@@ -100,7 +99,7 @@ Structured Career Recommendation
    cd ..
    ```
 
-3. Copy `.env.example` to `.env` and add API keys.
+3. Copy `.env.example` to `.env` and add the model, Neo4j Aura, and Qdrant Cloud credentials.
 
 4. Start the server:
 
@@ -112,7 +111,18 @@ Structured Career Recommendation
 
 > **Frontend dev mode** (hot reload): `cd frontend && npm run dev` — proxies `/api/*` to Flask on port 8001.
 
-Local development reads the graph from `graph/graph.gpickle`, the Chroma index from `index/chroma/`, and the LP model from `artifacts/link_prediction/link_predictor.pkl`. These are excluded from Git and must be hosted externally for deployment.
+Local and deployed inference read the graph from Neo4j AuraDB and vectors from Qdrant Cloud. The same embedding model is used for indexing and query-time retrieval. The small trained LP model is bundled, while raw datasets and generated graph/vector stores remain excluded from deployment.
+
+## Rebuild the cloud databases
+
+The databases are prepared locally and mutated only after preprocessing, vector generation, and held-out evaluation succeed:
+
+```bash
+python -m pip install -r requirements-research.txt
+python rebuild_databases.py
+```
+
+Use `python rebuild_databases.py --dry-run` to perform every preparation and evaluation step without changing either cloud database. The full command recreates the dedicated Aura graph and Qdrant collection, creates indexes, uploads in batches, validates counts and representative queries, and writes redacted reports under `artifacts/cloud_rebuild/`.
 
 ## Deploy to Vercel
 
@@ -122,13 +132,19 @@ Connect this repository and deploy the `dev` branch. Vercel detects `app.py` as 
 - `CHAT_MODEL_API_KEY`
 - `EMBED_MODEL_API_KEY`
 - `COHERE_RERANK_API_KEY`
+- `KG_URI`
+- `KG_USER`
+- `KG_PASS`
+- `KG_ID`
+- `VECTOR_ENDPOINT`
+- `VECTOR_PASS`
 
 **Optional (see `.env.example` for full list):**
 - `USE_LANGGRAPH=true` — enable agent orchestration (default: `true`)
 - `LINK_PREDICTION_ENABLED=true` — enabled by default
 - `EFFORT_WEIGHT_*` — tune effort score component weights
 
-The deployment does not ship graph, vector, or trained-model data. Connect the loaders to external hosted storage before treating production endpoints as ready.
+Set the variables for Preview and Production in Vercel before deploying. Do not paste their values into repository files. `vercel.json` packages the React build and LP model, excludes raw/local graph data, and allows the Python function enough time for its database-backed cold start.
 
 ## Project Structure
 
@@ -143,14 +159,16 @@ src/
   skill_gap.py              Skill resolution + accessibility ranking
   transition_embedding.py   Semantic-neighbour smoothing
   transition_effort.py      Transition Effort Score (TES) + upskill time estimate
-  link_prediction.py        LightGBM link predictor (11 features)
+  link_prediction.py        LightGBM predictor with model-declared feature compatibility
   kg_enrichment.py          Skill IDF + ISCO codes
   isco_edges.py             SAME_ISCO_GROUP structural edges
   faithfulness.py           Graph-provenance verification
   explainability.py         Typed-edge explanation chains
   hybrid_retrieval.py       Multi-source retrieval fusion
-  embeddings_index.py       ChromaDB embed + alignment
-  graph_store.py            Graph loading utilities
+  embeddings_index.py       Shared Azure embedding client + legacy offline utilities
+  neo4j_store.py            Aura schema, upload, validation, and runtime graph loading
+  qdrant_store.py           Qdrant indexing, payload metadata, and runtime vector adapter
+  graph_quality.py          Entity normalization, pruning, deduplication, connectivity enrichment
   text_normalization.py     Label normalization
   transition_policy.py      Training-only transition contract
 
@@ -196,6 +214,6 @@ frontend/                   React 19 + Vite + shadcn/ui + Tailwind v4
 2. **Skill-Gap-Aware Career Path Ranking** — deterministic accessible-to-aspirational ordering
 3. **Embedding-Smoothed Transition Inference** — cold-start coverage via semantic neighbours
 4. **Transition Effort Score** — multi-factor career switch difficulty metric with upskill time estimate
-5. **KG Link Prediction** — structural feature-based edge prediction (11 features, AUC 0.93)
+5. **KG Link Prediction** — structural/semantic missing-edge prediction with explicit virtual provenance
 6. **Graph-Provenance Faithfulness** — post-generation verification against graph topology
 7. **Provenance-Traced Explanation Chains** — typed-edge evidence paths per recommendation

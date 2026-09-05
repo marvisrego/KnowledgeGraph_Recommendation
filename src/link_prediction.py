@@ -10,7 +10,7 @@ Features per (source, target) role pair:
 3. Adamic-Adar Index (shared skills weighted by inverse log-degree)
 4. Resource Allocation Index (shared skills weighted by inverse degree)
 5. Preferential Attachment (product of skill counts)
-6. Embedding Cosine Similarity (from ChromaDB vectors)
+6. Embedding Cosine Similarity (from stored role vectors)
 7. Same ISCO Group (binary)
 8. IDF-weighted Skill Overlap (rare skills matter more)
 9. Neighbour Transition Evidence (do semantically similar roles transition here?)
@@ -408,7 +408,7 @@ def build_training_data(
     print("[link_prediction] Precomputing title TF-IDF vectors …")
     title_vectors = precompute_title_vectors(G)
     all_role_ids = [str(nid) for nid, d in G.nodes(data=True) if d.get("type") == "role"]
-    print("[link_prediction] Precomputing meta-path neighbour sets (≥3 shared skills) …")
+    print("[link_prediction] Precomputing meta-path neighbour sets (>=3 shared skills) ...")
     role_neighbours_3 = precompute_role_neighbours_3(skills_cache, all_role_ids)
 
     positives: list[tuple[str, str]] = []

@@ -44,6 +44,18 @@ class Settings:
     cohere_rerank_endpoint: str
     cohere_rerank_model: str
 
+    # --- Cloud persistence ---
+    kg_uri: str | None
+    kg_user: str | None
+    kg_pass: str | None
+    kg_id: str | None
+    neo4j_database: str | None
+    vector_endpoint: str | None
+    vector_pass: str | None
+    qdrant_collection: str
+    neo4j_batch_size: int
+    qdrant_batch_size: int
+
     # --- File paths ---
     onet_dir: Path
     esco_dir: Path
@@ -118,6 +130,17 @@ class Settings:
                 "https://career.azure-api.net/career-graph-ai/providers/cohere/v2/rerank",
             ),
             cohere_rerank_model=os.getenv("COHERE_RERANK_MODEL", "Cohere-rerank-v4.0-pro"),
+            # Cloud persistence
+            kg_uri=os.getenv("KG_URI"),
+            kg_user=os.getenv("KG_USER"),
+            kg_pass=os.getenv("KG_PASS"),
+            kg_id=os.getenv("KG_ID"),
+            neo4j_database=os.getenv("NEO4J_DATABASE") or None,
+            vector_endpoint=os.getenv("VECTOR_ENDPOINT"),
+            vector_pass=os.getenv("VECTOR_PASS"),
+            qdrant_collection=os.getenv("QDRANT_COLLECTION", "career_roles"),
+            neo4j_batch_size=int(os.getenv("NEO4J_BATCH_SIZE", "1000")),
+            qdrant_batch_size=int(os.getenv("QDRANT_BATCH_SIZE", "100")),
             # Paths
             onet_dir=_path("ONET_DIR", "Data/ONET"),
             esco_dir=_path(
@@ -145,13 +168,13 @@ class Settings:
             transition_traversal_limit=int(os.getenv("TRANSITION_TRAVERSAL_LIMIT", "8")),
             transition_smoothing_enabled=_bool("TRANSITION_SMOOTHING_ENABLED", True),
             transition_smoothing_neighbours=int(
-                os.getenv("TRANSITION_SMOOTHING_NEIGHBOURS", "20")
+                os.getenv("TRANSITION_SMOOTHING_NEIGHBOURS", "25")
             ),
             transition_smoothing_direct_weight=float(
-                os.getenv("TRANSITION_SMOOTHING_DIRECT_WEIGHT", "0.90")
+                os.getenv("TRANSITION_SMOOTHING_DIRECT_WEIGHT", "0.91")
             ),
             transition_smoothing_temperature=float(
-                os.getenv("TRANSITION_SMOOTHING_TEMPERATURE", "0.05")
+                os.getenv("TRANSITION_SMOOTHING_TEMPERATURE", "0.06")
             ),
             karrierewege_max_invalid_row_ratio=float(
                 os.getenv("KARRIEREWEGE_MAX_INVALID_ROW_RATIO", "0.001")

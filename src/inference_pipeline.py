@@ -172,7 +172,7 @@ def route_intent(query: str, settings: "Settings", history: list[dict] | None = 
 
 
 # ---------------------------------------------------------------------------
-# Step 2: Retrieval (ChromaDB)
+# Step 2: Retrieval (vector database)
 # ---------------------------------------------------------------------------
 
 def retrieve_candidates(
@@ -181,7 +181,7 @@ def retrieve_candidates(
     settings: "Settings",
     limit: int | None = None,
 ) -> list[dict]:
-    """Embed the query and retrieve top-K role candidates from ChromaDB."""
+    """Embed the query and retrieve top-K role candidates from the vector store."""
     from src.embeddings_index import embed_texts
 
     try:
@@ -199,7 +199,7 @@ def retrieve_candidates(
         )
     except Exception as exc:
         raise RuntimeError(
-            f"[inference_pipeline] ChromaDB query failed: {exc}"
+            f"[inference_pipeline] Vector database query failed: {exc}"
         ) from exc
 
     candidates = []
@@ -214,7 +214,7 @@ def retrieve_candidates(
                 "id": nid,
                 "metadata": meta,
                 "document": doc,
-                "score": 1.0 - dist,  # ChromaDB cosine distance → similarity
+                "score": 1.0 - dist,  # cosine distance to similarity
             }
         )
     return candidates

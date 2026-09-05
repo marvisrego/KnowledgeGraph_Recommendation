@@ -26,6 +26,27 @@ _TRANSITION_PRIORITY = {
 }
 
 
+def _model_feature_count(model: object, available: int) -> int:
+    """Return the trained model width without bypassing shape validation."""
+    count = None
+    num_feature = getattr(model, "num_feature", None)
+    if callable(num_feature):
+        count = num_feature()
+    elif getattr(model, "n_features_in_", None) is not None:
+        count = getattr(model, "n_features_in_")
+    if count is None:
+        return available
+    try:
+        count = int(count)
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError("Link-prediction model has an invalid feature schema") from exc
+    if count < 1 or count > available:
+        raise RuntimeError(
+            f"Link-prediction model expects {count} features, but runtime provides {available}"
+        )
+    return count
+
+
 def _role_candidate(role_id: str, G: nx.MultiDiGraph, **extra: Any) -> dict:
     """Create a reranker-compatible role candidate from a graph node."""
     from src.embeddings_index import build_role_text
@@ -153,8 +174,10 @@ class LinkPredictionRuntime:
                 self.isco_cache.get(target_id, ""),
             )
 
+        trained_feature_count = _model_feature_count(self.model, len(FEATURE_NAMES))
+        model_features = features[:, :trained_feature_count]
         with self.prediction_lock:
-            scores = np.asarray(self.model.predict(features), dtype=np.float64)
+            scores = np.asarray(self.model.predict(model_features), dtype=np.float64)
         count = min(top_k, len(candidates))
         top_indices = np.argsort(scores, kind="stable")[-count:][::-1]
         return [(candidates[index], float(scores[index])) for index in top_indices]
