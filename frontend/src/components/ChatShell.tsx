@@ -20,13 +20,13 @@ function EffortLegend({ roles }: { roles: Role[] }) {
   const high = roles.filter(r => r.effort_band === "high").length
   const none = roles.filter(r => !r.effort_band).length
   return (
-    <div className="flex items-center gap-3 text-[11px] font-mono">
+    <div className="effort-legend flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
       <span className="text-ink-muted">{roles.length} paths · sorted by effort</span>
-      <span className="flex items-center gap-1">
+      <span className="flex flex-wrap items-center gap-3">
         {low > 0 && <span className="text-success">● {low} low</span>}
         {mod > 0 && <span className="text-warn">● {mod} moderate</span>}
         {high > 0 && <span className="text-error">● {high} high</span>}
-        {none > 0 && <span className="text-ink-muted/50">● {none} unscored</span>}
+        {none > 0 && <span className="text-ink-muted">● {none} unscored</span>}
       </span>
     </div>
   )
@@ -58,7 +58,7 @@ function AssistantPayload({ payload }: { payload: ChatResponse }) {
   const topRole = roles[0]
 
   return (
-    <div className="flex flex-col gap-4 mt-2">
+    <div className="assistant-payload">
       {/* Faithfulness badge */}
       {faithfulness && <FaithfulnessBadge faithfulness={faithfulness} />}
 
@@ -71,7 +71,7 @@ function AssistantPayload({ payload }: { payload: ChatResponse }) {
           <div className="mb-2">
             <EffortLegend roles={roles} />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="role-grid">
             {roles.map((role, i) => (
               <RoleCard key={role.id} role={role} index={i} />
             ))}
@@ -90,10 +90,10 @@ function AssistantPayload({ payload }: { payload: ChatResponse }) {
       {/* Courses — always shown */}
       {courses.length > 0 && (
         <div>
-          <p className="text-[11px] text-ink-muted font-mono uppercase tracking-wider mb-2">
+          <h3 className="result-section-title">
             Recommended courses
-          </p>
-          <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: "thin" }}>
+          </h3>
+          <div className="course-track" tabIndex={0} aria-label="Recommended courses">
             {courses.map((course, i) => (
               <CourseCard key={course.title} course={course} index={i} />
             ))}
@@ -118,14 +118,15 @@ function YourPathPanel({
 }) {
   const [tab, setTab] = useState<"gap" | "plan">("gap")
   return (
-    <div className="rounded-xl border border-line bg-bg-raised overflow-hidden">
+    <div className="path-panel rounded-xl border border-line bg-bg-raised overflow-hidden">
       <div className="flex border-b border-line">
         {["gap", "plan"].map((t) => (
           <button
             key={t}
+            aria-pressed={tab === t}
             onClick={() => setTab(t as "gap" | "plan")}
             className={cn(
-              "flex-1 py-2.5 text-xs font-mono uppercase tracking-wide transition-colors",
+              "flex-1 px-3 py-3 text-sm font-medium transition-colors",
               tab === t ? "text-accent bg-accent/8 border-b-2 border-accent" : "text-ink-muted hover:text-ink",
             )}
           >
@@ -227,25 +228,28 @@ export function ChatShell() {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="chat-shell">
       {/* Toolbar */}
-      <div className="flex items-center justify-between border-b border-line px-4 py-3 flex-shrink-0">
+      <header className="chat-toolbar">
         <div className="flex items-center gap-2">
-          <Network className="w-4 h-4 text-accent" />
-          <span className="text-sm font-semibold text-ink">Career Advisor</span>
+          <Network aria-hidden="true" className="w-5 h-5 text-accent" />
+          <h2 className="text-base font-medium text-ink">Career Advisor</h2>
         </div>
         <button
           onClick={handleNewChat}
-          className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs text-ink-muted hover:text-ink hover:border-accent/40 transition-colors"
+          className="new-chat-button"
         >
-          <RotateCcw className="w-3 h-3" /> New chat
+          <RotateCcw aria-hidden="true" className="w-4 h-4" /> New chat
         </button>
-      </div>
+      </header>
 
       {/* Messages */}
       <div
         ref={chatLogRef}
-        className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-4"
+        className={cn("chat-log", messages.length === 1 && "chat-log-welcome")}
+        role="log"
+        aria-label="Conversation"
+        aria-live="polite"
         style={{ scrollbarWidth: "thin" }}
       >
         <AnimatePresence initial={false}>
@@ -255,17 +259,24 @@ export function ChatShell() {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.25 }}
-              className={cn("flex", msg.role === "user" ? "justify-end" : "justify-start")}
+              className={cn("message-row", msg.role === "user" ? "message-row-user" : "message-row-assistant", messages.length === 1 && "message-row-welcome")}
             >
               <div
                 className={cn(
-                  "rounded-xl px-4 py-3 max-w-[85%]",
+                  "message-body",
                   msg.role === "user"
-                    ? "bg-accent/10 border border-accent/20 text-ink text-sm"
-                    : "bg-bg-raised border border-line border-l-accent border-l-2 text-ink text-sm",
+                    ? "user-message"
+                    : "assistant-message",
                 )}
               >
-                <p className="leading-relaxed">
+                {messages.length === 1 && (
+                  <div className="welcome-heading">
+                    <div className="welcome-mark" aria-hidden="true"><Network /></div>
+                    <h2>Your next move,<br /><span>grounded in evidence.</span></h2>
+                  </div>
+                )}
+                {messages.length > 1 && <p className="message-author">{msg.role === "user" ? "You" : "Career Advisor"}</p>}
+                <p className="message-copy">
                   <MarkdownText text={msg.content} />
                 </p>
                 {msg.payload && <AssistantPayload payload={msg.payload} />}
@@ -281,7 +292,7 @@ export function ChatShell() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="flex justify-start"
+              className="message-row flex justify-start"
             >
               <PipelineIndicator visible={loading} />
             </motion.div>
@@ -295,7 +306,8 @@ export function ChatShell() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="rounded-xl border border-error/30 bg-error/8 px-4 py-3 text-sm text-error"
+              role="alert"
+              className="message-row rounded-xl border border-error/30 bg-error/8 px-4 py-3 text-sm text-error"
             >
               {error}
             </motion.div>
@@ -308,9 +320,14 @@ export function ChatShell() {
       {/* Composer */}
       <form
         onSubmit={handleSubmit}
-        className="flex-shrink-0 border-t border-line px-4 py-3 flex gap-2 items-end"
+        className="chat-composer"
       >
+        <label htmlFor="career-message" className="composer-label">Your role, skills, and next step</label>
+        <div className="composer-field">
         <textarea
+          id="career-message"
+          name="message"
+          autoComplete="off"
           ref={inputRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -319,22 +336,12 @@ export function ChatShell() {
           rows={2}
           maxLength={4000}
           disabled={loading}
-          className={cn(
-            "flex-1 resize-none rounded-xl border border-line bg-bg-raised px-4 py-3",
-            "text-sm text-ink placeholder:text-ink-muted/50 outline-none",
-            "focus:border-accent/50 focus:ring-0 transition-colors",
-            "disabled:opacity-50",
-          )}
+          className="composer-input"
         />
         <button
           type="submit"
           disabled={loading || !input.trim()}
-          className={cn(
-            "flex-shrink-0 flex items-center justify-center rounded-full w-10 h-10",
-            "border border-accent/30 bg-accent/10 text-accent",
-            "hover:bg-accent/20 hover:border-accent/60 transition-all duration-200",
-            "disabled:opacity-30 disabled:cursor-not-allowed",
-          )}
+          className="send-button"
           aria-label="Send"
         >
           {loading ? (
@@ -342,12 +349,14 @@ export function ChatShell() {
               animate={{ rotate: 360 }}
               transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
             >
-              <RotateCcw className="w-4 h-4" />
+              <RotateCcw aria-hidden="true" className="w-5 h-5" />
             </motion.div>
           ) : (
-            <Send className="w-4 h-4" />
+            <Send aria-hidden="true" className="w-5 h-5" />
           )}
         </button>
+        </div>
+        <div className="composer-hint" aria-hidden="true"><span>Start with where you are. Explore where you could go.</span><span>Enter to send <span className="hint-separator">/</span> Shift + Enter for a new line</span></div>
       </form>
     </div>
   )

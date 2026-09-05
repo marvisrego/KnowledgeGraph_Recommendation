@@ -54,8 +54,8 @@ export function RoleCard({ role, index = 0 }: Props) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05, duration: 0.3 }}
       className={cn(
-        "group relative rounded-xl border border-l-4 bg-bg-raised p-4 flex flex-col gap-3",
-        "transition-all duration-200 hover:shadow-[0_0_0_1px_rgba(76,194,234,0.15)] hover:-translate-y-0.5",
+        "role-card group relative border border-l-2 bg-bg-raised flex flex-col gap-4",
+        "transition-colors duration-200",
         band ? effortBorderColors[band] : "border-l-line",
         "border-line",
       )}
@@ -64,7 +64,7 @@ export function RoleCard({ role, index = 0 }: Props) {
       <div className="flex items-start justify-between gap-2">
         <span
           className={cn(
-            "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-mono uppercase tracking-wide",
+            "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-mono uppercase tracking-wide",
             sourceColors[role.source] ?? "bg-line/50 text-ink-muted border-line",
           )}
         >
@@ -72,7 +72,7 @@ export function RoleCard({ role, index = 0 }: Props) {
         </span>
         <div className="flex items-center gap-2 flex-shrink-0">
           {role.demand_trend && (
-            <span className={cn("text-[10px] font-mono",
+            <span className={cn("text-xs font-mono",
               role.demand_trend === "growing" ? "text-success" : role.demand_trend === "declining" ? "text-error" : "text-ink-muted"
             )}>
               {role.demand_trend === "growing" ? "↑ Growing" : role.demand_trend === "declining" ? "↓ Declining" : ""}
@@ -83,7 +83,7 @@ export function RoleCard({ role, index = 0 }: Props) {
               <span className={cn("text-lg font-bold leading-none font-mono", effortTextColors[band])}>
                 {effortPct}%
               </span>
-              <span className={cn("text-[9px] font-mono uppercase tracking-wide", effortTextColors[band])}>
+              <span className={cn("text-[13px] font-mono uppercase tracking-wide", effortTextColors[band])}>
                 {band} effort
               </span>
             </div>
@@ -96,15 +96,15 @@ export function RoleCard({ role, index = 0 }: Props) {
 
       {/* Description */}
       {role.description && (
-        <p className="text-[11px] text-ink-muted leading-relaxed line-clamp-2">{role.description}</p>
+        <p className="text-[13px] text-ink-muted leading-relaxed line-clamp-2">{role.description}</p>
       )}
 
       {/* Qualification bar */}
       {qualification !== undefined && (
         <div>
           <div className="flex justify-between items-center mb-1">
-            <span className="text-[10px] text-ink-muted font-mono">Skill match</span>
-            <span className="text-[10px] text-accent font-mono font-semibold">
+            <span className="text-xs text-ink-muted font-mono">Skill match</span>
+            <span className="text-xs text-accent font-mono font-semibold">
               {Math.round(qualification * 100)}%
               {role.have_count !== undefined && role.required_skill_count !== undefined && (
                 <span className="text-ink-muted ml-1">({role.have_count}/{role.required_skill_count})</span>
@@ -113,7 +113,7 @@ export function RoleCard({ role, index = 0 }: Props) {
           </div>
           <div className="h-1.5 w-full rounded-full bg-line overflow-hidden">
             <div
-              className="h-full rounded-full bg-accent transition-all duration-700"
+              className="h-full rounded-full bg-accent transition-colors duration-200"
               style={{ width: `${qualification * 100}%` }}
             />
           </div>
@@ -122,7 +122,7 @@ export function RoleCard({ role, index = 0 }: Props) {
 
       {/* Time to upskill */}
       {role.estimated_weeks_min !== undefined && role.estimated_weeks_max !== undefined && (
-        <span className="text-[11px] text-ink-muted font-mono">
+        <span className="text-[13px] text-ink-muted font-mono">
           ⏱ ~{formatWeeks(role.estimated_weeks_min)}–{formatWeeks(role.estimated_weeks_max)} to upskill
         </span>
       )}
@@ -131,12 +131,12 @@ export function RoleCard({ role, index = 0 }: Props) {
       {((role.have?.length ?? 0) > 0 || (role.need?.length ?? 0) > 0) && (
         <div className="flex flex-wrap gap-1">
           {role.have?.slice(0, 3).map((skill) => (
-            <span key={skill} className="inline-flex rounded-full border border-success/25 bg-success/8 px-2 py-0.5 text-[10px] text-success">
+            <span key={skill} className="inline-flex rounded-full border border-success/25 bg-success/8 px-2 py-0.5 text-xs text-success">
               ✓ {truncate(skill, 18)}
             </span>
           ))}
           {role.need?.slice(0, 2).map((skill) => (
-            <span key={skill} className="inline-flex rounded-full border border-warn/25 bg-warn/8 px-2 py-0.5 text-[10px] text-warn">
+            <span key={skill} className="inline-flex rounded-full border border-warn/25 bg-warn/8 px-2 py-0.5 text-xs text-warn">
               + {truncate(skill, 18)}
             </span>
           ))}
@@ -145,8 +145,9 @@ export function RoleCard({ role, index = 0 }: Props) {
 
       {/* Why recommended — collapsible */}
       <button
+        aria-expanded={showEvidence}
         onClick={() => setShowEvidence((v) => !v)}
-        className="flex items-center gap-1 text-[10px] text-ink-muted hover:text-ink-soft transition-colors"
+        className="flex items-center gap-1 text-xs text-ink-muted hover:text-ink-soft transition-colors"
       >
         <Zap className="w-3 h-3" />
         Why recommended?
@@ -156,16 +157,16 @@ export function RoleCard({ role, index = 0 }: Props) {
       <AnimatePresence>
         {showEvidence && (
           <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
             className="overflow-hidden"
           >
             <div className="flex flex-col gap-1.5 pt-1 border-t border-line">
               {/* Transition evidence */}
               {hasTransition && (
-                <div className="flex items-center gap-1.5 text-[11px]">
+                <div className="flex items-center gap-1.5 text-[13px]">
                   <Users className="w-3 h-3 text-accent flex-shrink-0" />
                   <span className="text-ink-soft">
                     <span className="text-accent font-semibold">{transitionCount?.toLocaleString()}</span> real transitions observed
@@ -177,7 +178,7 @@ export function RoleCard({ role, index = 0 }: Props) {
               )}
               {/* Retrieval sources */}
               {primarySource && (
-                <div className="flex items-center gap-1.5 text-[11px]">
+                <div className="flex items-center gap-1.5 text-[13px]">
                   <TrendingUp className="w-3 h-3 text-indigo flex-shrink-0" />
                   <span className="text-ink-soft">
                     Matched via <span className="text-indigo">{SOURCE_LABELS[primarySource] ?? primarySource}</span>
@@ -186,7 +187,7 @@ export function RoleCard({ role, index = 0 }: Props) {
               )}
               {/* Qualification note */}
               {qualification !== undefined && (
-                <div className="flex items-center gap-1.5 text-[11px]">
+                <div className="flex items-center gap-1.5 text-[13px]">
                   <span className="w-3 h-3 text-center text-success">✓</span>
                   <span className="text-ink-soft">
                     You already have <span className="text-success font-semibold">{Math.round(qualification * 100)}%</span> of required skills
@@ -197,7 +198,7 @@ export function RoleCard({ role, index = 0 }: Props) {
               {retrievalSources.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-0.5">
                   {retrievalSources.slice(0, 3).map((src) => (
-                    <span key={src} className="rounded-full border border-line bg-bg-interactive px-2 py-0.5 text-[9px] text-ink-muted font-mono">
+                    <span key={src} className="rounded-full border border-line bg-bg-interactive px-2 py-0.5 text-[13px] text-ink-muted font-mono">
                       {src.replace(/_/g, " ")}
                     </span>
                   ))}

@@ -1043,3 +1043,26 @@ The GitHub `dev` branch is connected and deployed on Vercel. Required model/clou
 10. The workflow opened PR #8 containing only the validated portable model. Its Vercel preview passed and the PR was merged into `dev` as `32ce418`.
 11. Final production smoke checks passed: the public React root returned HTTP 200, `/api/status` reported Aura/Qdrant/smoothing/link prediction ready with no error, and a representative `/api/chat` request returned HTTP 200 with a structured path payload.
 12. Updated `actions/checkout`, `actions/setup-python`, and `actions/upload-artifact` to their current v7 majors after the successful run reported Node.js 20 deprecation notices. No second full training run was consumed solely for this maintenance-only pin change.
+
+---
+
+## Session Changes (2026-09-06): main advisor UI refresh
+
+The visual refresh was scoped to the main React Career Advisor. Existing routes, API calls, conversation state, controls, response data, and graph viewer behavior were preserved.
+
+### UI implementation
+
+1. Reworked the application shell in `frontend/src/App.tsx` and `frontend/src/index.css` with a bounded desktop frame, clearer sidebar hierarchy, a calmer deep-space surface system, consistent spacing, safe-area padding, and a mobile single-column fallback.
+2. Refined `ChatShell.tsx` with an evidence-led welcome state, full-width assistant responses, readable user message treatment, a labeled composer, keyboard guidance, stronger focus states, message semantics, and clearer result-section hierarchy.
+3. Rebalanced role cards, stats tiles, course cards, evidence panels, skill-gap panels, learning roadmap controls, transferable-skill content, and the pipeline indicator without changing their data or interaction contracts.
+4. Added explicit accessible state metadata for tabs, disclosures, status updates, the conversation log, and the message field. Motion remains transform/opacity based and respects reduced-motion preferences.
+5. Added the page theme color metadata and rebuilt `public_react/`, the static bundle served by Flask and Vercel.
+
+### Verification
+
+- `npm.cmd run build`: passed with the TypeScript check and Vite production build.
+- Playwright checks used mocked API responses to exercise submission, loading, result expansion, evidence, learning-plan tabs, New chat, error recovery, and empty responses at 1440, 1280, 820, 390, and 320px.
+- Responsive checks reported no console errors, page or component overflow, or axe WCAG violations.
+- `npm.cmd run lint`: passed with one non-blocking existing `react(set-state-in-effect)` warning in `PipelineIndicator.tsx`.
+- `git diff --check`: passed.
+- The local Flask `/api/status` endpoint returned HTTP 200; the current machine reported Qdrant Cloud connectivity unavailable, which is an external service state rather than a frontend regression.

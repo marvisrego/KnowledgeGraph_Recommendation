@@ -29,8 +29,9 @@ export function EvidencePanel({ explanations, faithfulness }: Props) {
   const hasEntityDetails = matched.length + unreachable.length + unmatched.length > 0
 
   return (
-    <div className="rounded-xl border border-line bg-bg-raised overflow-hidden">
+    <div className="evidence-panel rounded-xl border border-line bg-bg-raised overflow-hidden">
       <button
+        aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-bg-interactive transition-colors"
       >
@@ -40,7 +41,7 @@ export function EvidencePanel({ explanations, faithfulness }: Props) {
           {pct !== null && (
             <span
               className={cn(
-                "ml-1 rounded-full border px-2 py-0.5 text-[10px] font-mono",
+                "ml-1 rounded-full border px-2 py-0.5 text-xs font-mono",
                 pct >= 70 ? "border-success/30 text-success" : pct >= 40 ? "border-warn/30 text-warn" : "border-error/30 text-error",
               )}
             >
@@ -54,9 +55,9 @@ export function EvidencePanel({ explanations, faithfulness }: Props) {
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
@@ -66,14 +67,14 @@ export function EvidencePanel({ explanations, faithfulness }: Props) {
               {pct !== null && (
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[10px] font-mono text-ink-muted">Evidence strength</span>
-                    <span className="text-[10px] font-mono text-accent">
+                    <span className="text-xs font-mono text-ink-muted">Evidence strength</span>
+                    <span className="text-xs font-mono text-accent">
                       {faithfulness?.matched_count ?? faithfulness?.reachable_count ?? "?"}/{faithfulness?.total_entities ?? "?"} entities in graph
                     </span>
                   </div>
                   <div className="h-1.5 w-full rounded-full bg-line overflow-hidden">
                     <div
-                      className={cn("h-full rounded-full transition-all duration-700",
+                      className={cn("h-full rounded-full transition-colors duration-200",
                         pct >= 70 ? "bg-success" : pct >= 40 ? "bg-warn" : "bg-error"
                       )}
                       style={{ width: `${pct}%` }}
@@ -89,11 +90,11 @@ export function EvidencePanel({ explanations, faithfulness }: Props) {
                     <div>
                       <div className="flex items-center gap-1 mb-1">
                         <CheckCircle2 className="w-3 h-3 text-success" />
-                        <span className="text-[10px] font-mono text-success uppercase tracking-wide">Verified in graph</span>
+                        <span className="text-xs font-mono text-success uppercase tracking-wide">Verified in graph</span>
                       </div>
                       <div className="flex flex-wrap gap-1">
                         {matched.map((e) => (
-                          <span key={e} className="rounded-full border border-success/20 bg-success/8 px-2 py-0.5 text-[10px] text-success">
+                          <span key={e} className="rounded-full border border-success/20 bg-success/8 px-2 py-0.5 text-xs text-success">
                             {e}
                           </span>
                         ))}
@@ -104,11 +105,11 @@ export function EvidencePanel({ explanations, faithfulness }: Props) {
                     <div>
                       <div className="flex items-center gap-1 mb-1">
                         <AlertCircle className="w-3 h-3 text-warn" />
-                        <span className="text-[10px] font-mono text-warn uppercase tracking-wide">In graph, not on path</span>
+                        <span className="text-xs font-mono text-warn uppercase tracking-wide">In graph, not on path</span>
                       </div>
                       <div className="flex flex-wrap gap-1">
                         {unreachable.map((e) => (
-                          <span key={e} className="rounded-full border border-warn/20 bg-warn/8 px-2 py-0.5 text-[10px] text-warn">
+                          <span key={e} className="rounded-full border border-warn/20 bg-warn/8 px-2 py-0.5 text-xs text-warn">
                             {e}
                           </span>
                         ))}
@@ -119,11 +120,11 @@ export function EvidencePanel({ explanations, faithfulness }: Props) {
                     <div>
                       <div className="flex items-center gap-1 mb-1">
                         <XCircle className="w-3 h-3 text-error" />
-                        <span className="text-[10px] font-mono text-error uppercase tracking-wide">Not found in graph</span>
+                        <span className="text-xs font-mono text-error uppercase tracking-wide">Not found in graph</span>
                       </div>
                       <div className="flex flex-wrap gap-1">
                         {unmatched.map((e) => (
-                          <span key={e} className="rounded-full border border-error/20 bg-error/8 px-2 py-0.5 text-[10px] text-error">
+                          <span key={e} className="rounded-full border border-error/20 bg-error/8 px-2 py-0.5 text-xs text-error">
                             {e}
                           </span>
                         ))}
@@ -136,10 +137,10 @@ export function EvidencePanel({ explanations, faithfulness }: Props) {
               {/* Provenance chains */}
               {explanations && explanations.length > 0 && (
                 <div className="flex flex-col gap-3">
-                  <p className="text-[10px] font-mono text-ink-muted uppercase tracking-wide">Provenance paths</p>
+                  <p className="text-xs font-mono text-ink-muted uppercase tracking-wide">Provenance paths</p>
                   {explanations.slice(0, 4).map((exp, i) => (
                     <div key={i} className="rounded-lg border border-line bg-bg-interactive p-3 flex flex-col gap-2">
-                      <div className="flex items-center gap-1 text-[11px] text-ink-soft font-mono">
+                      <div className="flex items-center gap-1 text-[13px] text-ink-soft font-mono">
                         <span className="truncate max-w-[100px]">{exp.source_role}</span>
                         <ArrowRight className="w-3 h-3 text-ink-muted flex-shrink-0" />
                         <span className="truncate max-w-[100px] text-accent">{exp.target_role}</span>
@@ -151,7 +152,7 @@ export function EvidencePanel({ explanations, faithfulness }: Props) {
                             <div key={j} className="flex items-center gap-1">
                               <span
                                 className={cn(
-                                  "inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-[9px] font-mono uppercase whitespace-nowrap",
+                                  "inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-[13px] font-mono uppercase whitespace-nowrap",
                                   meta?.color ?? "text-ink-muted border-line bg-bg-raised",
                                 )}
                               >
@@ -159,7 +160,7 @@ export function EvidencePanel({ explanations, faithfulness }: Props) {
                                 {meta?.label ?? step.relation.replace(/_/g, " ")}
                               </span>
                               {j < exp.steps.length - 1 && (
-                                <span className="text-[9px] text-ink-muted">{step.to}</span>
+                                <span className="text-[13px] text-ink-muted">{step.to}</span>
                               )}
                             </div>
                           )

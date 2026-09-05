@@ -25,10 +25,10 @@ export function TransferableSkills({ roles }: Props) {
 
   return (
     <div className="rounded-xl border border-line bg-bg-raised px-4 py-3">
-      <div className="flex items-center gap-2 mb-2">
+      <div className="transferable-heading flex items-center gap-2 mb-2">
         <Sparkles className="w-4 h-4 text-success" />
         <span className="text-sm font-medium text-ink">Your transferable strengths</span>
-        <span className="text-[10px] text-ink-muted font-mono ml-auto">
+        <span className="text-xs text-ink-muted font-mono ml-auto">
           {shared.length} skills apply across multiple roles
         </span>
       </div>
@@ -39,10 +39,10 @@ export function TransferableSkills({ roles }: Props) {
             initial={{ scale: 0.85, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: i * 0.03 }}
-            className="inline-flex items-center gap-1 rounded-full border border-success/25 bg-success/8 px-3 py-1 text-[11px] text-success"
+            className="inline-flex items-center gap-1 rounded-full border border-success/25 bg-success/8 px-3 py-1 text-[13px] text-success"
           >
             {skill}
-            <span className="rounded-full bg-success/20 px-1.5 py-0.5 text-[9px] font-mono">
+            <span className="rounded-full bg-success/20 px-1.5 py-0.5 text-[13px] font-mono">
               ×{count}
             </span>
           </motion.span>
