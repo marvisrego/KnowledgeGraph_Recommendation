@@ -1037,3 +1037,9 @@ The GitHub `dev` branch is connected and deployed on Vercel. Required model/clou
 4. Removed generated local graph/index stores, cloud preparation/smoke caches, and the accidental workspace `~/` directory after verifying every target was inside the repository workspace.
 5. Preserved ignored `Data/` because it is the only complete source input for `python rebuild_databases.py`; it remains excluded from Git and Vercel.
 6. Rebuilt the production frontend and verified the resulting `public_react/` bundle contains the SPA and graph-viewer assets.
+7. Pushed cleanup commit `b58de79` to `dev`; Vercel preview passed, then PR #7 merged the workflow and cleanup into default `main`.
+8. Triggered GitHub Actions run `33975475939` with `target_branch=dev`. The standard Ubuntu job completed successfully in 2m57s, including focused tests, Aura/Qdrant loading, grouped validation, model export, and artifact upload.
+9. The cloud run produced AUC `0.883507`, AP `0.702902`, Hits@1 `0.713725`, Hits@3 `0.853595`, Hits@5 `0.911111`, Hits@10 `0.949020`, and MRR `0.797201`; every configured publication gate passed.
+10. The workflow opened PR #8 containing only the validated portable model. Its Vercel preview passed and the PR was merged into `dev` as `32ce418`.
+11. Final production smoke checks passed: the public React root returned HTTP 200, `/api/status` reported Aura/Qdrant/smoothing/link prediction ready with no error, and a representative `/api/chat` request returned HTTP 200 with a structured path payload.
+12. Updated `actions/checkout`, `actions/setup-python`, and `actions/upload-artifact` to their current v7 majors after the successful run reported Node.js 20 deprecation notices. No second full training run was consumed solely for this maintenance-only pin change.
