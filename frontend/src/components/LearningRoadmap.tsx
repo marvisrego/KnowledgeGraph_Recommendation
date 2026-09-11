@@ -16,7 +16,7 @@ export function LearningRoadmap({ plan }: Props) {
   const entry = plan[selectedRole]
 
   return (
-    <div className="rounded-xl border border-line bg-bg-raised overflow-hidden">
+    <div className="roadmap-panel rounded-xl border border-line bg-bg-raised overflow-hidden">
       <div className="px-4 py-3 border-b border-line flex items-center gap-2">
         <BookOpen className="w-4 h-4 text-indigo" />
         <span className="text-sm font-medium text-ink">Learning Roadmap</span>

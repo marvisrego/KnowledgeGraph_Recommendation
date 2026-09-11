@@ -24,7 +24,7 @@ export function TransferableSkills({ roles }: Props) {
   if (shared.length === 0) return null
 
   return (
-    <div className="rounded-xl border border-line bg-bg-raised px-4 py-3">
+    <div className="transferable-panel rounded-xl border border-line bg-bg-raised px-4 py-3">
       <div className="transferable-heading flex items-center gap-2 mb-2">
         <Sparkles className="w-4 h-4 text-success" />
         <span className="text-sm font-medium text-ink">Your transferable strengths</span>

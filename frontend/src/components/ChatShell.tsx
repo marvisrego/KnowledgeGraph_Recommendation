@@ -161,6 +161,47 @@ export function ChatShell() {
   const chatEndRef = useRef<HTMLDivElement>(null)
   const chatLogRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const welcomeRef = useRef<HTMLDivElement>(null)
+  const isWelcome = messages.length === 1
+
+  // Decorative only: no chat state updates or interception of input events.
+  useEffect(() => {
+    const area = welcomeRef.current
+    if (!isWelcome || !area) return
+    const enabled = window.matchMedia("(hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)")
+    let frame = 0
+    let x = 0
+    let y = 0
+    const hide = () => {
+      cancelAnimationFrame(frame)
+      frame = 0
+      area.style.setProperty("--glow-visible", "0")
+    }
+    const move = (event: PointerEvent) => {
+      if (!enabled.matches || event.pointerType !== "mouse") return
+      const bounds = area.getBoundingClientRect()
+      x = event.clientX - bounds.left
+      y = event.clientY - bounds.top
+      if (frame) return
+      frame = requestAnimationFrame(() => {
+        area.style.setProperty("--glow-x", `${x}px`)
+        area.style.setProperty("--glow-y", `${y}px`)
+        area.style.setProperty("--glow-visible", "1")
+        frame = 0
+      })
+    }
+    area.addEventListener("pointermove", move, { passive: true })
+    area.addEventListener("pointerleave", hide)
+    area.addEventListener("pointercancel", hide)
+    enabled.addEventListener("change", hide)
+    return () => {
+      hide()
+      area.removeEventListener("pointermove", move)
+      area.removeEventListener("pointerleave", hide)
+      area.removeEventListener("pointercancel", hide)
+      enabled.removeEventListener("change", hide)
+    }
+  }, [isWelcome])
 
   // Scroll to new message — respects user scroll position
   const scrollToLatest = useCallback(() => {
@@ -270,7 +311,15 @@ export function ChatShell() {
                 )}
               >
                 {messages.length === 1 && (
-                  <div className="welcome-heading">
+                  <div className="welcome-heading" ref={welcomeRef}>
+                    <div className="welcome-atmosphere" aria-hidden="true">
+                      <svg className="welcome-network" viewBox="0 0 400 240" fill="none">
+                        <path d="M40 150 130 60 230 110 330 35M130 60l35 145 65-95 125 85M40 150l125 55 190-10M230 110l100-75" />
+                        <circle cx="40" cy="150" r="5" /><circle cx="130" cy="60" r="7" />
+                        <circle cx="165" cy="205" r="5" /><circle cx="230" cy="110" r="9" />
+                        <circle cx="330" cy="35" r="5" /><circle cx="355" cy="195" r="6" />
+                      </svg>
+                    </div>
                     <div className="welcome-mark" aria-hidden="true"><Network /></div>
                     <h2>Your next move,<br /><span>grounded in evidence.</span></h2>
                   </div>
