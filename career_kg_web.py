@@ -115,10 +115,29 @@ def create_app():
                 _cache["link_prediction_attempted"] = True
         return _cache["link_prediction_runtime"]
 
+    def _send_react_index():
+        # Vercel normalizes file timestamps. Same-size HTML builds can therefore
+        # share a metadata ETag despite pointing to different hashed assets.
+        response = flask.send_from_directory(
+            str(_react_dist), "index.html", conditional=False, etag=False,
+        )
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    @app.before_request
+    def _frontend_html_cache_policy():
+        # Flask's existing static route also exposes the entrypoint directly.
+        if (
+            request.method in {"GET", "HEAD"}
+            and request.endpoint == "static"
+            and (request.view_args or {}).get("filename") == "index.html"
+        ):
+            return _send_react_index()
+
     @app.get("/")
     def index():
         if _react_dist.exists():
-            return flask.send_from_directory(str(_react_dist), "index.html")
+            return _send_react_index()
         return jsonify({
             "error": "Frontend build is missing. Run `npm run build` in frontend/.",
         }), 503
@@ -134,7 +153,7 @@ def create_app():
             react_file = _react_dist / path
             if react_file.exists() and react_file.is_file():
                 return flask.send_from_directory(str(_react_dist), path)
-            return flask.send_from_directory(str(_react_dist), "index.html")
+            return _send_react_index()
         return flask.abort(404)
 
     @app.get("/api/graph-data")
