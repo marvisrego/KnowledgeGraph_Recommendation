@@ -1066,3 +1066,65 @@ The visual refresh was scoped to the main React Career Advisor. Existing routes,
 - `npm.cmd run lint`: passed with one non-blocking existing `react(set-state-in-effect)` warning in `PipelineIndicator.tsx`.
 - `git diff --check`: passed.
 - The local Flask `/api/status` endpoint returned HTTP 200; the current machine reported Qdrant Cloud connectivity unavailable, which is an external service state rather than a frontend regression.
+
+
+---
+
+## Session Changes (2026-09-11): visual polish and Vercel HTML cache repair
+
+### Approved scope and research
+
+The user requested presentation-only improvements, restricted skill use to frontend/UI skills, and required website inspiration and screenshots before implementation. The selected direction was refined dark; the user also approved reflowing the existing sidebar above the mobile chat. The initial scope excluded backend, API, traversal, retrieval, reranking, and recommendation changes.
+
+Inspected the React advisor, result components, Flask-served build, and separate graph viewer. Used the local `redesign-existing-projects` and `anti-ui-slop` frontend skills. Captured Linear's dark surfaces and hierarchy, Raycast's button hover/border treatment, and Resend's spacing and restrained depth. Baseline captures included desktop/mobile welcome screens and fixture-backed populated results and graph inspection.
+
+### UI implementation and delivery
+
+1. Updated the existing theme to charcoal `#0B0F14`, panel `#12171E`, raised `#1A222C`, border `#303D4C`, primary text `#EDF2F7`, muted text `#A2AFBF`, and cyan `#4CC2EA`. Kept semantic effort/status/category colors distinct.
+2. Retained Outfit and JetBrains Mono, increased supporting-text readability, and refined sidebar statistics, headings, cards, score displays, tabs, evidence, transferable skills, course footers, and composer focus.
+3. Reflowed the same sidebar content above the chat on mobile using CSS. The page can scroll past it while the conversation retains its own viewport and existing near-bottom scroll detection. Improved narrow-screen input height and long-content wrapping.
+4. Added 180-220ms hover/focus feedback and a 2px lift only for linked course cards. Corrected presentation-class ordering so the existing effort-colored left card borders are visible.
+5. Added a clipped welcome-only 320px cursor glow at up to 6% opacity and a faint SVG network motif. A local ref and `requestAnimationFrame` update CSS variables without chat-state updates. Pointer listeners and frames are cleaned up; touch/coarse-pointer and reduced-motion users do not receive the glow.
+6. Restyled the graph header, legend, controls, selector, inspector, and tooltip through CSS. Graph sampling, canvas category colors, interactions, and all recommendation logic remained unchanged.
+7. Rebuilt the tracked `public_react/` bundle. Committed/pushed `44cab5b` (`Polish career advisor and graph explorer UI`) to `dev`; the user merged [PR #11](https://github.com/marvisrego/KnowledgeGraph_Recommendation/pull/11) into `main` as `42c51e5`. Production deployment `6400355787` completed successfully.
+
+### UI validation and limits
+
+- `npm.cmd run build`: passed (TypeScript and Vite).
+- `npm.cmd run lint`: passed with the existing non-blocking `react(set-state-in-effect)` warning in `PipelineIndicator.tsx`.
+- `.venv\Scripts\python.exe -m unittest discover -s tests -q`: 150 tests passed before the cache repair.
+- Baseline browser run: 46 checks. Updated UI: 54 main checks plus 20 edge-case checks, all passed with no JavaScript runtime errors.
+- Checked 1440px desktop, 1366px laptop, 768px tablet, 390px mobile, 320px narrow layouts, and short-height views. Covered submission, Enter/Shift+Enter, loading/disabled/error/text-only responses, New chat, role evidence, gap/plan tabs, roadmap selectors, course links, graph selection/tooltips/pan/zoom/fit/retry/navigation, focus, pointer motion, long content, optional fields, and scroll preservation.
+- Compared browser request URLs/methods/bodies and displayed recommendation content against the baseline; only intentional CSS text-case differences were excluded from the text comparison.
+- Sampled desktop advisor, graph, and mobile axe checks found no WCAG A/AA violations. This is sampled automated evidence, not a claim of comprehensive accessibility certification.
+- Fixture-backed screenshots and successful UI flows are not live recommendation tests. During local smoke testing, `/api/status` returned 200 but reported `graph_loaded: false`; live `/api/chat` and `/api/graph-data` returned 503. No database repair was attempted.
+- JavaScript syntax checks and `git diff --check` passed. Unrelated `.gitignore`, `.agents/`, `Writing/`, and `novelty.md` changes were excluded from both code commits.
+
+### White-screen diagnosis after the production merge
+
+1. The user reported a white screen on `https://knowledge-graph-recommendation.vercel.app/` after merging the UI PR.
+2. A fresh Chromium session rendered the production UI; the current `index-ClD024wf.js` and `index--5hu2itn.css` assets returned 200 with correct MIME types and no runtime errors. GitHub/Vercel confirmed the production deployment matched PR #11's merge SHA.
+3. Returning-browser cache validation exposed the failure: both the previous (`71097ff`) and new (`44cab5b`) HTML entrypoints were 822 bytes. Vercel normalized the file timestamp to `1540000000`, allowing Flask's path/size/timestamp-based ETag to remain identical despite changed HTML.
+4. Production returned 304 for the cached validator `"1540000000.0-822-3542224033"`. The stale HTML referenced old `index-BpOfLR5z.js` and `index-C9CQ_DaI.css` assets, which now returned 404. Loading that old HTML against current production reproduced a white page with no mounted React children.
+5. Ctrl+Shift+R or a fresh query-string URL bypasses the old cached HTML. This is immediate recovery, not a permanent deployment fix.
+6. The user explicitly approved a narrow exception to the original UI-only constraint: change Flask's frontend-HTML caching behavior, leaving routes, APIs, and recommendation logic unchanged.
+
+### Permanent HTML cache fix
+
+- Added `_send_react_index()` in `career_kg_web.py`, using `conditional=False`, `etag=False`, and `Cache-Control: no-store` for the frontend HTML.
+- The homepage and existing SPA fallback use that helper. A narrowly scoped pre-request hook applies it to GET/HEAD requests for the existing static `/index.html` entrypoint.
+- Route definitions, API handlers, graph/recommendation behavior, static JS/CSS conditional caching, HEAD response bodies, and OPTIONS handling remain unchanged.
+- Added `tests/test_frontend_html_cache.py`: four tests cover changed same-size/same-timestamp HTML; old ETag, Last-Modified, and combined headers; direct HTML and fallback delivery; unchanged asset 304s; HEAD/OPTIONS; missing assets/API paths; and a missing build.
+- Full suite: 154 tests passed. The targeted four tests also passed after explicitly preserving OPTIONS handling. Fresh and repeated local Chromium page loads rendered correctly with no runtime errors; `/` and `/index.html` returned 200/no-store without ETags when old conditional headers were sent.
+- Committed/pushed `2d5b84b` (`Prevent stale frontend HTML after Vercel deployments`) to `dev`. Local and remote SHAs matched.
+- Opened [PR #12](https://github.com/marvisrego/KnowledgeGraph_Recommendation/pull/12), `dev` to `main`. Vercel preview deployment `6400513015` passed; `gh pr checks 12 --watch --interval 10` reported successful checks.
+
+### Current handoff and remaining verification
+
+PR #12 initially remained open after the fix was pushed. While updating these records, live verification confirmed it had merged into `main` as `2e37d17` at 2026-09-11 19:45:13 UTC. Vercel production deployment `6400532594` succeeded at 19:45:42 UTC.
+
+Post-merge production verification passed: `/` and `/index.html` returned HTTP 200 with the current asset references, `Cache-Control: no-store`, and no ETag even when the previous `If-None-Match` and `If-Modified-Since` headers were sent. A Chromium production load and reload with those validators mounted the advisor without runtime errors. The permanent fix is deployed; retain this cache-regression check for future frontend deployments. The browser check screenshot is `cache-fix-production-verified.png` in the local evidence directory.
+
+A separate production readiness check returned HTTP 200 from `/api/status` with `ready: false`, `graph_loaded: false`, `qdrant_loaded: true`, and zero loaded nodes/edges. The graph-readiness cause was not investigated or changed during this session. Earlier successful cloud validation remains historical evidence, not proof of present recommendation availability.
+
+Local research and test artifacts are under `C:/Users/marvi/AppData/Local/Temp/career-ui-research/`, including `before-welcome.png`, `after-welcome.png`, `after-mobile.png`, `before.json`, `after.json`, accessibility JSON reports, `verify.cjs`, `edge-check.cjs`, `reproduced-cached-white-screen.png`, and `cache-fix-verified.png`. These files are temporary and uncommitted; populated UI captures use browser-only sample data.
