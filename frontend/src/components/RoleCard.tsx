@@ -56,8 +56,8 @@ export function RoleCard({ role, index = 0 }: Props) {
       className={cn(
         "role-card group relative border border-l-2 bg-bg-raised flex flex-col gap-4",
         "transition-colors duration-200",
-        band ? effortBorderColors[band] : "border-l-line",
         "border-line",
+        band ? effortBorderColors[band] : "border-l-line",
       )}
     >
       {/* Top row: source + effort score */}

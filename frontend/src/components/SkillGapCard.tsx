@@ -14,7 +14,7 @@ export function SkillGapCard({ entries }: Props) {
   if (!entries?.length) return null
 
   return (
-    <div className="rounded-xl border border-line bg-bg-raised overflow-hidden">
+    <div className="skill-gap-panel rounded-xl border border-line bg-bg-raised overflow-hidden">
       <div className="px-4 py-3 border-b border-line flex items-center gap-2">
         <Zap className="w-4 h-4 text-warn" />
         <span className="text-sm font-medium text-ink">Skill Gap Analysis</span>
