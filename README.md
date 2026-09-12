@@ -1,245 +1,268 @@
 # Agentic GraphRAG Career Intelligence Platform
 
-An agentic career recommendation system combining a multi-taxonomy knowledge graph (ONET + ESCO), empirical career transitions (Karrierewege), LangGraph agent orchestration, link prediction, and LLM-grounded generation to provide evidence-based career guidance.
+An evidence-led career-advising system for the thesis project. It combines an integrated O*NET/ESCO knowledge graph, train-only empirical career transitions, Qdrant semantic retrieval, LangGraph agent orchestration, and graph-grounded LLM generation.
 
-## Architecture
+The deployed application is served from [Vercel](https://knowledge-graph-recommendation.vercel.app/). Its authoritative data stores are Neo4j AuraDB (knowledge graph) and Qdrant Cloud (role vectors); raw source data and generated local stores are not deployed.
 
-```
-User Query
-    │
-    ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                   LangGraph Agent Pipeline (12 nodes)             │
-│                                                                    │
-│  Intent → Retrieval → Ranking → Qualification → Traversal         │
-│                                                                    │
-│  → Effort Scoring → Skill Gap Analysis → Course Search            │
-│                                                                    │
-│  → Learning Plan → Generation → Faithfulness → Explanation        │
-└──────────────────────────────────────────────────────────────────┘
-    │
-    ▼
-Structured Career Recommendation
-(roles sorted by effort, stats tiles, skill gaps, learning roadmap,
- graph-verified evidence chains, clickable Coursera courses)
-```
+## Capabilities
 
-## Key Features
+- Recommends career roles from semantic, structural, and empirical-transition evidence.
+- Extracts a current role, owned skills, and goal from conversational context.
+- Scores qualification, skill gaps, transition effort, transferable skills, and estimated upskilling time.
+- Produces phased learning plans and real Coursera search results.
+- Checks generated role/skill references against graph entities and returns typed evidence paths.
+- Exposes LightGBM-predicted links as explicitly virtual evidence; it never writes them back as observed graph relationships.
 
-- **Knowledge Graph**: 19,241 nodes and 240,906 relationships in Neo4j AuraDB, spanning ONET + ESCO with 18,907 train-only career transition edges
-- **Transition Effort Score (TES)**: Multi-factor difficulty metric (IDF-weighted skill gap, ISCO domain distance, empirical support, transferability) — displayed as percentage with upskill time estimate
-- **Qualification Scoring**: IDF-weighted fraction of essential skills the user already has per target role
-- **Skill Gap Analysis**: Per-role ranked missing skills by TES reduction impact, quick wins, and blockers
-- **Learning Roadmap**: Phased upskill plan with Coursera course groupings and week estimates
-- **Link Prediction**: LightGBM over structural, semantic, transition, ISCO, and skill features, exposed only as scored virtual missing-edge backfill
-- **Faithfulness Verification**: Post-generation check showing verified/unreachable/unmatched entities with percentage score
-- **Explanation Chains**: Typed-edge evidence paths (TRANSITIONS\_TO, SIMILAR\_TO, REQUIRES) per recommendation
-- **Hybrid Retrieval**: Vector search + accepted transition smoothing + role-relevant graph overlap, with LP coverage backfill
-- **Embedding-Smoothed Transitions**: Semantic-neighbour propagation for cold-start roles (+26.1pp source-role coverage)
-- **ISCO Group Edges**: Structural domain-proximity edges between roles sharing a 2-digit ISCO code
+## Current validated data layer
 
-## Inference Pipeline
+| Resource | Validated state |
+| --- | --- |
+| Neo4j AuraDB | 19,241 nodes and 240,906 relationships |
+| Qdrant Cloud | 3,932 role vectors, 3,072 dimensions, cosine distance |
+| Empirical transitions | 18,907 support-filtered, train-only `TRANSITIONS_TO` edges |
+| Runtime | AuraDB, Qdrant, transition smoothing, and link prediction loaded successfully on 2026-09-12 |
 
-| Step | Component | Method |
-|------|-----------|--------|
-| 1 | Intent Routing | LLM classifies user type, extracts skills/role/goal |
-| 2 | Retrieval | RRF over Qdrant, direct/smoothed transitions, IDF skill overlap; LP missing-edge backfill |
-| 3 | Reranking | Cohere rerank-v4.0-pro → top-8 candidates |
-| 4 | Qualification | IDF-weighted % of essential skills owned per candidate |
-| 5 | Graph Traversal | REQUIRES, SIMILAR\_TO, observed and explicitly inferred transition triples |
-| 6 | Effort Scoring | TES = 0.35×SkillGap + 0.15×Domain + 0.25×(1-Empirical) + 0.25×(1-Transfer) |
-| 7 | Skill Gap Analysis | Ranked missing skills by TES reduction impact |
-| 8 | Course Search | Coursera search for skill gaps |
-| 9 | Learning Plan | Phased roadmap from skill gap + courses |
-| 10 | Generation | LLM grounded in graph triples (2–3 sentences) |
-| 11 | Faithfulness | Entity extraction → graph match → BFS reachability |
-| 12 | Explanations | Typed-edge path tracing per recommended role |
+AuraDB may be paused by its provider. If `/api/status` reports `graph_loaded: false`, resume the instance, wait for it to become available, then retry the endpoint.
 
-## Evaluation Results
+## System architecture
 
-| Method | Hits@1 | Hits@3 | Hits@5 | Hits@10 | MRR | Source coverage |
-|--------|--------|--------|--------|---------|-----|-----------------|
-| Direct edges (cloud rebuild baseline) | 0.1478 | 0.2850 | 0.3702 | 0.5014 | 0.2591 | 73.9% |
-| Accepted embedding smoothing | **0.1483** | **0.2857** | **0.3723** | **0.5059** | **0.2618** | **100%** |
-
-| Model | Metric | Value |
-|-------|--------|-------|
-| Link Prediction | 5-fold CV AUC | 0.9344 |
-| Link Prediction | 5-fold CV AP | 0.8186 |
-| Link Prediction | Standalone test Hits@5 | 0.0274 (coverage-only; not promoted as top-K ranker) |
-
-## Technology Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Knowledge Graph | Neo4j AuraDB, loaded as a NetworkX MultiDiGraph snapshot at runtime |
-| Vector Store | Qdrant Cloud (cosine, 3,932 role vectors) |
-| Embeddings | Azure OpenAI text-embedding-3-large |
-| Reranker | Cohere rerank-v4.0-pro |
-| LLM | Azure OpenAI gpt-5.4-nano (Responses API) |
-| Link Prediction | LightGBM cloud training; portable JSON/NumPy inference on Vercel |
-| Agent Orchestration | LangGraph StateGraph (12 nodes) |
-| Backend | Flask (Python 3.13) |
-| Frontend | React 19 + Vite + Tailwind CSS v4 + Framer Motion |
-
-## Run Locally
-
-1. Install Python dependencies:
-
-   ```bash
-   python -m pip install -r requirements.txt
-   ```
-
-2. Install frontend dependencies and build:
-
-   ```bash
-   cd frontend
-   npm install
-   npm run build
-   cd ..
-   ```
-
-3. Copy `.env.example` to `.env` and add the model, Neo4j Aura, and Qdrant Cloud credentials.
-
-4. Start the server:
-
-   ```bash
-   python career_kg_web.py
-   ```
-
-5. Open http://127.0.0.1:8001
-
-> **Frontend dev mode** (hot reload): `cd frontend && npm run dev` — proxies `/api/*` to Flask on port 8001.
-
-Local and deployed inference read the graph from Neo4j AuraDB and vectors from Qdrant Cloud. The same embedding model is used for indexing and query-time retrieval. The small trained LP model is bundled, while raw datasets and generated graph/vector stores remain excluded from deployment.
-
-## Train link prediction fully online
-
-GitHub Actions supplies the temporary Linux training computer; Vercel continues to host the application. GitHub Pages is not used because it cannot run the Flask API.
-
-The manual workflow at `.github/workflows/train-link-prediction.yml` reconstructs the production graph from AuraDB, reads existing ESCO vectors from Qdrant, trains LightGBM with source-role-disjoint folds, removes held-out-source transitions from neighbour-evidence features, and reports AUC, average precision, Hits@1/3/5/10, MRR, and NDCG. A candidate must pass all configured gates before the workflow can create a model-update pull request.
-
-Configure these GitHub Actions repository secrets:
-
-- `KG_URI`
-- `KG_USER`
-- `KG_PASS`
-- `KG_ID`
-- `VECTOR_ENDPOINT`
-- `VECTOR_PASS`
-- `NEO4J_DATABASE` only when using a non-default database
-
-Optionally set the repository variable `QDRANT_COLLECTION`; it defaults to `career_roles`. The workflow does not require chat, embedding, or reranking API keys because it reuses vectors already stored in Qdrant.
-
-Because the repository default branch is `main`, the workflow must exist on `main` for GitHub to display its manual **Run workflow** button. Run it with `target_branch=dev` and pull-request publishing enabled; after review, merge the generated model PR so Vercel builds the updated portable model from `dev`.
-
-The repository is configured with all six required cloud secrets, `QDRANT_COLLECTION=career_roles`, read/write workflow permissions, and permission for Actions to create pull requests. `NEO4J_DATABASE` remains optional. The workflow requests only `contents: write` and `pull-requests: write`; it runs only when manually started.
-
-The workflow uploads the candidate model and redacted metrics as a 7-day Actions artifact. Its job timeout is 30 minutes, it never writes predicted relationships to AuraDB, and it does not expose endpoint or credential values in the report.
-
-## Rebuild the cloud databases
-
-The databases are prepared locally and mutated only after preprocessing, vector generation, and held-out evaluation succeed:
-
-```bash
-python -m pip install -r requirements-research.txt
-python rebuild_databases.py
+```text
+Browser (React 19 / Vite)
+  | GET /api/status, POST /api/chat, GET /api/graph-data
+  v
+Flask application (app.py -> career_kg_web.py)
+  | lazy, lock-protected resource loading
+  +-------------------------+-------------------------+
+  |                         |                         |
+  v                         v                         v
+Neo4j AuraDB          Qdrant Cloud              Portable LP model
+typed MultiDiGraph    role-vector retrieval     JSON + NumPy inference
+NetworkX snapshot     Azure embedding queries   virtual edges only
+  |                         |                         |
+  +-------------------------+-------------------------+
+                            |
+                            v
+             LangGraph workflow or compatibility pipeline
+                            |
+                            v
+            Structured career recommendation response
 ```
 
-Use `python rebuild_databases.py --dry-run` to perform every preparation and evaluation step without changing either cloud database. The full command recreates the dedicated Aura graph and Qdrant collection, creates indexes, uploads in batches, validates counts and representative queries, and writes redacted reports under `artifacts/cloud_rebuild/`.
+`career_kg_web.py` reads the graph from AuraDB, exposes Qdrant through the retrieval adapter, and caches those read-only resources per process. The committed React production bundle lives in `public_react/` and is served by Flask/Vercel. HTML entry points have `Cache-Control: no-store` to prevent cached HTML from referencing obsolete hashed assets; JavaScript and CSS retain normal static-asset caching.
 
-## Deploy to Vercel
+### Data lifecycle
 
-Connect this repository and deploy the `dev` branch. Vercel detects `app.py` as the Flask entry point.
-
-**Required environment variables:**
-- `CHAT_MODEL_API_KEY`
-- `EMBED_MODEL_API_KEY`
-- `COHERE_RERANK_API_KEY`
-- `KG_URI`
-- `KG_USER`
-- `KG_PASS`
-- `KG_ID`
-- `VECTOR_ENDPOINT`
-- `VECTOR_PASS`
-
-**Optional (see `.env.example` for full list):**
-- `USE_LANGGRAPH=true` — enable agent orchestration (default: `true`)
-- `LINK_PREDICTION_ENABLED=true` — enabled by default
-- `EFFORT_WEIGHT_*` — tune effort score component weights
-
-Set the variables for Preview and Production in Vercel before deploying. Do not paste their values into repository files. `vercel.json` packages the React build and LP model, excludes raw/local graph data, and allows the Python function enough time for its database-backed cold start.
-
-## Project Structure
-
-```
-app.py                      Vercel entry point
-career_kg_web.py            Flask server (port 8001)
-train_link_prediction_cloud.py  Aura/Qdrant cloud training entry point
-config.py                   Environment-based settings
-coursera_client.py          Course search integration
-
-src/
-  inference_pipeline.py     12-step inference orchestration
-  skill_gap.py              Skill resolution + accessibility ranking
-  transition_embedding.py   Semantic-neighbour smoothing
-  transition_effort.py      Transition Effort Score (TES) + upskill time estimate
-  link_prediction.py        LightGBM predictor with model-declared feature compatibility
-  portable_lightgbm.py      Dependency-free JSON model inference for Vercel
-  kg_enrichment.py          Skill IDF + ISCO codes
-  isco_edges.py             SAME_ISCO_GROUP structural edges
-  faithfulness.py           Graph-provenance verification
-  explainability.py         Typed-edge explanation chains
-  hybrid_retrieval.py       Multi-source retrieval fusion
-  embeddings_index.py       Shared Azure embedding client + legacy offline utilities
-  neo4j_store.py            Aura schema, upload, validation, and runtime graph loading
-  qdrant_store.py           Qdrant indexing, payload metadata, and runtime vector adapter
-  graph_quality.py          Entity normalization, pruning, deduplication, connectivity enrichment
-  text_normalization.py     Label normalization
-  transition_policy.py      Training-only transition contract
-
-agents/
-  state.py                  CareerAgentState TypedDict
-  graph.py                  LangGraph StateGraph (12 nodes)
-  tools.py                  6 graph query tools
-  nodes/
-    intent.py               Intent routing
-    retrieval.py            Vector + transition retrieval
-    ranking.py              Cohere rerank + gap ranking
-    qualification_node.py   IDF-weighted skill qualification score
-    traversal.py            Graph traversal
-    effort.py               TES computation + effort sorting
-    skill_gap_node.py       Ranked skill gap per role
-    courses.py              Coursera search
-    learning_plan_node.py   Phased learning roadmap
-    generation.py           LLM generation
-    faithfulness_node.py    Post-generation verification
-    explanation.py          Evidence chain tracing
-
-frontend/                   React 19 + Vite + Tailwind v4
-  src/
-    components/
-      ChatShell.tsx         Main chat layout + message rendering
-      RoleCard.tsx          Role card with effort, qualification, evidence
-      StatsTiles.tsx        4-tile stats row per top role
-      TransferableSkills.tsx Cross-role shared skill strengths
-      SkillGapCard.tsx      Priority skills / quick wins / blockers
-      LearningRoadmap.tsx   Phased learning timeline
-      EvidencePanel.tsx     Graph-verified entity breakdown + provenance
-      FaithfulnessBadge.tsx Verified % badge
-      CourseCard.tsx        Clickable Coursera course card
-      PipelineIndicator.tsx 5-stage animated pipeline loader
-      StatusPanel.tsx       Server status + graph stats
-    api.ts                  Typed fetch wrappers
-    types.ts                Shared TypeScript interfaces
+```text
+O*NET + ESCO + Karrierewege training split
+  -> typed graph build and quality controls
+  -> enrichment and train-only transitions
+  -> role embeddings and Qdrant collection
+  -> held-out validation/test evaluation
+  -> Neo4j AuraDB upload and round-trip validation
+  -> Vercel runtime: Aura snapshot + Qdrant retrieval + agents
 ```
 
-## Novel Research Contributions
+The rebuild validates allowed node/edge types, normalized labels, finite weights, no self/duplicate/held-out transition evidence, cloud counts, representative Cypher queries, deterministic vector retrieval, and similarity search. `Data/` is ignored but retained locally because it is required for a reproducible full rebuild. Local `graph/` and `index/` runtime stores are not authoritative and are excluded from Vercel.
 
-1. **Empirical Career Transition Edges** — 18,907 frequency-weighted edges from 568,888 real career trajectories
-2. **Skill-Gap-Aware Career Path Ranking** — deterministic accessible-to-aspirational ordering
-3. **Embedding-Smoothed Transition Inference** — cold-start coverage via semantic neighbours
-4. **Transition Effort Score** — multi-factor career switch difficulty metric with upskill time estimate
-5. **KG Link Prediction** — structural/semantic missing-edge prediction with explicit virtual provenance
-6. **Graph-Provenance Faithfulness** — post-generation verification against graph topology
-7. **Provenance-Traced Explanation Chains** — typed-edge evidence paths per recommendation
+## AI agent workflow
+
+When `USE_LANGGRAPH=true` (the default in `config.py`), `/api/chat` runs `agents/graph.py`:
+
+```text
+Full context
+intent -> retrieval -> ranking -> qualification -> traversal -> effort
+       -> skill gap -> courses -> learning plan -> generation
+       -> faithfulness -> explanation -> response
+
+Partial context
+intent -> retrieval -> ranking -> qualification -> traversal -> explore -> response
+```
+
+The partial route deliberately stops before effort, learning-plan generation, LLM generation, faithfulness, and explanations, so it does not present a complete path without enough user context. `USE_LANGGRAPH=false` selects the maintained compatibility pipeline in `src/inference_pipeline.py`.
+
+| Agent / stage | Responsibility |
+| --- | --- |
+| Intent | Extracts user type, current role, owned skills, goal, and context sufficiency. |
+| Retrieval | Combines Qdrant vectors, observed/smoothed transitions, skill overlap, and LP coverage backfill. |
+| Ranking | Applies Cohere reranking and role-aware evidence. |
+| Qualification | Calculates the IDF-weighted share of essential skills already owned. |
+| Traversal | Builds bounded role, requirement, and transition triples. |
+| Effort | Calculates Transition Effort Score (TES) and upskill-time range. |
+| Skill gap | Identifies priority skills, quick wins, and blockers. |
+| Courses / learning plan | Retrieves course results and groups them into phased plans. |
+| Generation | Produces concise guidance grounded in retrieved graph labels. |
+| Faithfulness | Checks extracted entities for graph match and bounded reachability. |
+| Explanation | Returns typed provenance paths for recommendations. |
+
+## Retrieval, ranking, and provenance
+
+The hybrid retriever uses distinct sources rather than a single score:
+
+1. Qdrant returns semantically related roles for the embedded query.
+2. Direct `TRANSITIONS_TO` evidence and embedding-smoothed distributions add plausible destinations for a resolved current role.
+3. IDF-weighted role-requirement overlap adds graph-structural candidates.
+4. Reciprocal-rank fusion combines the primary sources.
+5. LightGBM is appended only as missing-edge coverage backfill. Its `predicted_transition` evidence remains request-local and is never persisted to AuraDB.
+6. Cohere reranking, qualification, graph traversal, TES, and skill-gap analysis form the response payload.
+
+`src/transition_policy.py` is the shared leakage guard. Only Karrierewege `TRANSITIONS_TO` edges with `split=train` (or legacy edges with no split marker) may influence smoothing, traversal, TES, explanations, LP indexing/training, or evaluation. Explicit validation/test edges are excluded.
+
+### Transition Effort Score
+
+Higher TES means a more demanding transition:
+
+```text
+TES = 0.35 * skill-gap magnitude
+    + 0.15 * ISCO domain distance
+    + 0.25 * (1 - empirical support)
+    + 0.25 * (1 - skill transferability)
+```
+
+TES returns low, moderate, or high bands and an estimated week range. Role-relevant requirements are used so optional generic skills do not distort technical-role effort scores.
+
+### Graph-provenance faithfulness
+
+After generation, `src/faithfulness.py` extracts cited role/skill candidates, matches normalized labels to graph entities, and runs bounded reachability from the retrieved anchor roles. The response includes `score`, matched entities, unmatched entities, unreachable entities, and typed explanation chains. It is a post-generation grounding signal, not complete factual verification of prose.
+
+## Evaluation evidence
+
+The transition ranker was selected on validation data and evaluated once on the held-out test split. Validation and test transitions are not runtime evidence.
+
+| Held-out test method | Hits@1 | Hits@3 | Hits@5 | Hits@10 | MRR | Source coverage |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Direct train-edge baseline | 0.1478 | 0.2850 | 0.3702 | 0.5014 | 0.2591 | 0.7389 |
+| Accepted embedding-smoothed ranker | **0.1483** | **0.2857** | **0.3723** | **0.5059** | **0.2618** | **1.0000** |
+
+The accepted production ranker is the semantic smoother: its top-K gains are modest, but source-role coverage rises from 73.9% to 100%.
+
+| Link-prediction evidence | Result | Interpretation |
+| --- | --- | --- |
+| Five-fold classification CV | AUC 0.9344; AP 0.8186 | Useful classification signal. |
+| Standalone held-out transition ranking | Hits@5 0.0274; Hits@10 0.0447; MRR 0.0182 | Not promoted as an equal-weight top-K ranker. |
+| Successful cloud-training run | AUC 0.883507; AP 0.702902; Hits@5 0.911111; MRR 0.797201 | Source-grouped sampled-negative gates; not comparable with the official held-out test. |
+
+```powershell
+# Deterministic offline tests
+.\.venv\Scripts\python.exe -m unittest discover -s tests -q
+
+# Held-out and diagnostic evaluation
+.\.venv\Scripts\python.exe evaluation/evaluate_karrierewege.py
+.\.venv\Scripts\python.exe evaluation/evaluate_retrieval_strategies.py
+.\.venv\Scripts\python.exe evaluation/evaluate_transition_ranker.py
+.\.venv\Scripts\python.exe evaluation/pipeline_ablation.py
+```
+
+## API
+
+| Endpoint | Method | Purpose |
+| --- | --- | --- |
+| `/` | GET | React career-advisor application. |
+| `/graph` | GET | Interactive graph viewer. |
+| `/api/status` | GET | Lazy-loads dependencies and reports graph/vector/model readiness. |
+| `/api/chat` | POST | Accepts `{"messages": [{"role": "user", "content": "..."}]}` and returns structured guidance. |
+| `/api/graph-data` | GET | Returns a bounded graph-viewer sample and aggregate graph statistics. |
+
+Chat responses can contain narrative text, path/explore data, evidence, faithfulness, explanations, skill-gap analysis, learning plan, courses, and metadata. The frontend normalizes supported legacy/current response shapes at its API boundary.
+
+## Local setup
+
+Prerequisites: Python 3.13, Node.js/npm, and credentials for the model, AuraDB, and Qdrant services. In PowerShell, use `npm.cmd` when `npm` is blocked.
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+
+Set-Location frontend
+npm.cmd install
+npm.cmd run build
+Set-Location ..
+
+.\.venv\Scripts\python.exe career_kg_web.py
+```
+
+Open `http://127.0.0.1:8001`. For hot reload, run `npm.cmd run dev` from `frontend/` while Flask runs on port 8001.
+
+Create an uncommitted `.env` file; never commit or print credentials.
+
+| Required group | Variables |
+| --- | --- |
+| Chat | `CHAT_MODEL_API_KEY`, `CHAT_MODEL_ENDPOINT`, `CHAT_MODEL` |
+| Embeddings | `EMBED_MODEL_API_KEY`, `EMBED_MODEL_ENDPOINT`, `EMBED_MODEL` |
+| Reranking | `COHERE_RERANK_API_KEY`, `COHERE_RERANK_ENDPOINT`, `COHERE_RERANK_MODEL` |
+| Neo4j AuraDB | `KG_URI`, `KG_USER`, `KG_PASS`, `KG_ID`, optional `NEO4J_DATABASE` |
+| Qdrant Cloud | `VECTOR_ENDPOINT`, `VECTOR_PASS`, optional `QDRANT_COLLECTION` (default: `career_roles`) |
+
+Feature flags include `USE_LANGGRAPH`, `TRANSITION_SMOOTHING_ENABLED`, and `LINK_PREDICTION_ENABLED`. See `config.py` for all defaults, limits, and TES weights.
+
+## Verification
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests -q
+.\.venv\Scripts\python.exe -m compileall -q src agents evaluation career_kg_web.py app.py
+.\.venv\Scripts\python.exe -m pip check
+
+Set-Location frontend
+npm.cmd run build
+npm.cmd run lint
+Set-Location ..
+
+git diff --check
+curl.exe --silent --show-error https://knowledge-graph-recommendation.vercel.app/api/status
+```
+
+The known `react(set-state-in-effect)` warning in `PipelineIndicator.tsx` is pre-existing and non-blocking when lint otherwise succeeds.
+
+## Cloud rebuild
+
+`rebuild_databases.py` is an administration command, not an application-startup step. A full run clears and recreates the dedicated AuraDB graph and Qdrant collection only after preparation, held-out evaluation, and cloud connectivity validation pass.
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-research.txt
+
+# Safe: prepares and evaluates without cloud mutation.
+.\.venv\Scripts\python.exe rebuild_databases.py --dry-run
+
+# Destructive: intentionally replaces both cloud stores.
+.\.venv\Scripts\python.exe rebuild_databases.py
+```
+
+Redacted preparation and rebuild reports are written under `artifacts/cloud_rebuild/`.
+
+## GitHub Actions link-prediction training
+
+`.github/workflows/train-link-prediction.yml` is manual-only. GitHub-hosted Ubuntu loads the production AuraDB graph and Qdrant vectors, runs source-role-disjoint validation, exports a portable JSON model, uploads a seven-day artifact, and can create a focused update pull request.
+
+Required repository secrets: `KG_URI`, `KG_USER`, `KG_PASS`, `KG_ID`, `VECTOR_ENDPOINT`, and `VECTOR_PASS`. `NEO4J_DATABASE` is optional, and `QDRANT_COLLECTION` is an optional repository variable. The workflow must exist on the default branch for GitHub to offer **Run workflow**; use `target_branch=dev` for the update PR. It never writes predicted relationships to AuraDB.
+
+## Vercel deployment
+
+`app.py` is the Vercel entry point. `vercel.json` packages Flask templates, `public_react/`, and the portable model; it excludes raw data, tests, evaluation output, local graph/vector stores, and training-only dependencies. Configure the same model and cloud variables in Vercel for the intended Preview/Production targets. The function has a 300-second maximum duration for cold starts and model calls. Do not run database rebuilds during a Vercel build or request.
+
+## Repository map
+
+```text
+app.py                         Vercel entry point
+career_kg_web.py               Flask routes and lazy cloud-resource loading
+config.py                      Environment-backed settings
+rebuild_databases.py           Controlled cloud rebuild command
+train_link_prediction_cloud.py Fully online LightGBM trainer
+agents/                        LangGraph state, nodes, and tools
+src/                           Graph build, cloud stores, retrieval, scoring, provenance
+evaluation/                    Held-out metrics, diagnostics, and ablations
+tests/                         Deterministic regression suite
+frontend/                      React/Vite source
+public_react/                  Committed production bundle
+.github/workflows/             Manual cloud-training workflow
+HANDOFF.md                     Operational handoff and delivery record
+ALL_STEPS.md                   Chronological implementation/experiment record
+novelty.md                     Thesis-contribution record
+```
+
+## Research boundaries
+
+- Empirical transitions describe population-level observations, not guaranteed or causal outcomes.
+- Held-out validation/test evidence is excluded from runtime and training-transition evidence.
+- LightGBM is coverage backfill, not a claimed top-K ranking improvement.
+- Faithfulness checks entity match/reachability; it is not complete factual verification.
+- Coursera and hosted cloud services are external dependencies; `/api/status` is the source of truth for current runtime readiness.

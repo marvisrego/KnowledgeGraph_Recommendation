@@ -1,19 +1,33 @@
 # GraphRAG Career Advisor — Session Handoff
 
-## Project State (as of 2026-09-06)
+## Project State (as of 2026-09-11)
 
-GraphRAG career chatbot for a thesis. **React frontend + LangGraph 12-node pipeline. Fully built and running.**
+GraphRAG career chatbot for a thesis. **React frontend + LangGraph 12-node pipeline. The production UI and HTML cache fix are deployed and browser-verified; cloud runtime readiness must be rechecked.**
 
 - **Branch:** `dev`
 - **Remote:** `https://github.com/marvisrego/KnowledgeGraph_Recommendation.git`
 - **Server:** `python career_kg_web.py` → `http://127.0.0.1:8001`
 - **Frontend:** React 19 + Vite + Tailwind CSS v4 (built to `public_react/`, served by Flask)
-- **Knowledge graph:** Neo4j AuraDB, rebuilt and live with 19,241 nodes and 240,906 relationships
-- **Vector database:** Qdrant Cloud, rebuilt and live with 3,932 role vectors at 3,072 dimensions
+- **Knowledge graph:** Neo4j AuraDB; last successful rebuild validation on 2026-09-05 recorded 19,241 nodes and 240,906 relationships. The 2026-09-11 production status check reports `graph_loaded: false`.
+- **Vector database:** Qdrant Cloud; last rebuild validation recorded 3,932 role vectors at 3,072 dimensions. The 2026-09-11 production status check reports `qdrant_loaded: true`; vector counts were not revalidated during the UI work.
 - **Runtime:** Aura is loaded into a NetworkX compatibility snapshot; semantic retrieval runs against Qdrant
 - **Rebuild:** `python rebuild_databases.py` prepares, evaluates, rebuilds, and validates both dedicated cloud databases
-- **Vercel:** deployment completed from `dev`; `app.py` serves the bundled React build and LP model, while raw data and local graph/vector artifacts stay excluded
+- **Vercel:** production is `https://knowledge-graph-recommendation.vercel.app/`. UI PR #11 merged as `42c51e5`; cache-fix PR #12 merged into `main` as `2e37d17` and its production deployment passed. `app.py` serves the bundled React build and LP model, while raw data and local graph/vector artifacts stay excluded.
 - **GitHub Actions:** cloud-training secrets, `QDRANT_COLLECTION=career_roles`, read/write workflow permissions, and pull-request creation are configured at repository level
+
+### 2026-09-11 UI polish and white-screen cache repair
+
+- **UI delivery:** `44cab5b` (`Polish career advisor and graph explorer UI`) was pushed to `dev`, then merged through [PR #11](https://github.com/marvisrego/KnowledgeGraph_Recommendation/pull/11). Production deployment `6400355787` corresponds to merge commit `42c51e5`.
+- Applied the approved charcoal/cyan palette, retained Outfit and JetBrains Mono, improved text hierarchy, card spacing, tabs, disclosures, composer focus, and graph-viewer controls. Reflowed existing sidebar content above the mobile chat; the page can scroll while the conversation retains its own viewport and existing scroll-position behavior.
+- Added restrained hover feedback and a welcome-only 320px cursor glow with at most 6% opacity. Coordinates use a local ref and `requestAnimationFrame`; pointer listeners/frames are cleaned up, and the glow is disabled for touch/coarse pointers and reduced motion. No new dependency was introduced.
+- The UI pass preserved API requests, response normalization, recommendation values, graph interactions, and backend logic. Research references were Linear, Raycast, and Resend; only frontend skills were used.
+- **UI verification:** production build passed; 150 Python tests and 74 browser checks passed. Browser checks covered desktop/tablet/mobile and 320px/short-height cases, existing controls, matching baseline requests and recommendation content (allowing CSS text-case changes), long content, optional fields, scroll preservation, hover, focus, and reduced/coarse-pointer motion. Sampled advisor, graph, and mobile axe checks reported no WCAG A/AA violations. Lint retained the existing non-blocking `PipelineIndicator.tsx` state-in-effect warning.
+- **White-screen diagnosis:** fresh production loads rendered correctly, but a returning browser could reuse stale HTML. Both the old and new entrypoints were 822 bytes, and Vercel normalized their timestamps to `1540000000`. Flask generated the same metadata ETag, returned HTTP 304 for the changed HTML, and left the browser requesting old hashed JS/CSS assets that returned 404. Serving the old HTML against production reproduced a white screen.
+- **Authorized cache-only exception:** after the original UI-only scope, the user explicitly approved a narrow Flask frontend-HTML caching fix. Commit `2d5b84b` (`Prevent stale frontend HTML after Vercel deployments`) disables conditional responses and ETags for the entrypoint and sends `Cache-Control: no-store`. This covers `/`, GET/HEAD `/index.html`, and the existing SPA fallback without changing route definitions, APIs, recommendation logic, or static JS/CSS caching.
+- **Cache verification:** all 154 Python tests passed, including four new tests in `tests/test_frontend_html_cache.py`. They cover same-size/same-timestamp changes, old ETag/Last-Modified headers, direct HTML and fallback delivery, asset conditional caching, HEAD/OPTIONS, and missing paths/builds. Fresh and repeated local browser loads rendered without runtime errors.
+- **Production delivery verified:** [PR #12](https://github.com/marvisrego/KnowledgeGraph_Recommendation/pull/12) merged into `main` as `2e37d17`. Vercel production deployment `6400532594` succeeded after preview `6400513015`. Both `/` and `/index.html` returned HTTP 200, the current asset references, `Cache-Control: no-store`, and no ETag when the old ETag and Last-Modified headers were supplied. Production browser load and reload mounted the advisor without runtime errors. Screenshot: `cache-fix-production-verified.png` in the local evidence directory.
+- **Separate readiness limitation:** the latest production `/api/status` returned HTTP 200 with `ready: false`, `graph_loaded: false`, `qdrant_loaded: true`, and zero loaded nodes/edges. Live successful recommendation generation was not verified in this session; no graph/database repair was attempted. Historical successful cloud counts below are not current readiness evidence.
+- **Local evidence:** `C:/Users/marvi/AppData/Local/Temp/career-ui-research/` contains reference/before/after screenshots, the white-screen reproduction, browser check scripts, JSON results, and the cache-fix screenshot. Successful result/graph UI captures use browser-only fixtures, not live model output. These temporary artifacts are not committed and may be cleaned up by Windows.
 
 ### 2026-09-06 main advisor UI refresh
 
@@ -270,36 +284,34 @@ This gives the user something visual to explore while they answer the follow-up.
 
 ## Frontend
 
-### Chat response layout (per assistant turn)
-1. **Text bubble** — 2–3 sentence advice from the LLM
-2. **Career Path visual** (full context only) — horizontal scrollable track of role cards with essential skill chips and arrow connectors between roles
-3. **Explore panels** (partial context only) — two stacked panels: skills chip grid + roles scrollable track
-4. **Coursera courses** — up to 5 cards (title, provider, chips, description)
+### Current React structure and response layout
 
-### Career Path visual (`addCareerPath` in `chat.js`)
-- Each role card: ONET/ESCO source badge (blue/green), title, prep level, essential skill chips
-- Arrow connectors between cards; horizontal scroll with thin scrollbar
-- Skill chips wrap (`word-break: break-word`); titles truncated at 38 chars on the backend
+- `frontend/src/App.tsx` composes `StatusPanel` and `ChatShell`; `frontend/src/index.css` supplies the visual system. Vite writes the committed deployment bundle to `public_react/`.
+- `ChatShell` retains the welcome message, user/assistant conversation, pipeline loading indicator, error feedback, New chat, and the labeled composer. Enter sends; Shift+Enter inserts a newline; the existing 4,000-character limit and loading/empty-input disabling remain unchanged.
+- When supplied by the existing response, assistant results show faithfulness, top-role statistics, role cards, transferable skills, skill-gap/learning-plan tabs, a horizontal course track, and provenance evidence. Data, ordering, score calculations, field visibility, and disclosure defaults were preserved.
+- Role cards remain a two-column desktop grid and one column at narrower widths. Their effort-colored edges, skill chips, evidence disclosures, and course links retain their existing meaning and behavior.
+- The legacy `chat.js` helpers referenced in older history are no longer the active frontend. See `ALL_STEPS.md` for that historical implementation.
 
-### Explore panels (`addExplorePanels` in `chat.js`)
-- Skills panel: wrapping grid of `explore-skill-chip` elements (up to 20 skills, sorted by frequency across roles)
-- Roles panel: horizontal scrollable `explore-role-card` track with description snippet
+### Design and motion
 
-### Design
-- **Palette:** `#070A10` deep space, `#0E141E` graphite, `#151E2B` slate, `#EAF1F8` frost, `#4CC2EA` cyan
-- **Font:** Outfit + JetBrains Mono
-- Calm scientific-instrument direction with one restrained atmospheric wash, evidence-first hierarchy, and optional GSAP entry motion
-- Responsive two-column desktop shell, compact tablet layout, and single-column mobile flow with 44–48px controls
-- Sanitized assistant Markdown, safe external links/course titles, explicit loading/error states, and reduced-motion/transparency support
-- One active chat request at a time; New Chat aborts and invalidates stale responses
+- **Palette:** charcoal `#0B0F14`, panel `#12171E`, raised surface `#1A222C`, border `#303D4C`, text `#EDF2F7`, muted text `#A2AFBF`, and cyan `#4CC2EA`. Success/warning/error and graph-category semantics remain distinct.
+- **Typography:** Outfit for headings/body, JetBrains Mono for metrics/technical metadata; 16px conversation text and generally 14px supporting result text.
+- Existing desktop/sidebar structure, safe-area spacing, visible focus, and touch-sized controls remain. Below 768px the same sidebar reflows above the chat; the page scrolls, and the conversation keeps its internal scrolling viewport so existing near-bottom detection still works.
+- Hover transitions use roughly 180-220ms easing; linked course cards lift 2px. The welcome-only cursor glow is decorative, clipped, non-interactive, and disabled for reduced-motion/coarse-pointer users.
+- React/Framer Motion and CSS implement presentation; this pass introduced no GSAP or other dependency. Existing content rendering and `AppErrorBoundary` remain unchanged.
 
 ### Knowledge Graph Viewer (`/graph`)
-- Responsive Cytoscape.js workspace with a scroll-safe header and legend
-- `/api/graph-data` samples top-60 ONET + top-60 ESCO roles by degree + up to 160 skill nodes
-- Color coding: blue = ONET, green = ESCO, amber = skills; dashed amber edges = TRANSITIONS_TO
-- Click/tap node → highlight neighbourhood and open a persistent inspector; pointer hover → clamped summary tooltip
-- Skill and isolated-node labels are progressively disclosed to reduce visual noise
-- Non-2xx, empty-data, and Cytoscape CDN failures produce a retryable error state
+
+- Cytoscape.js interactions remain in `frontend/public/graph.js`; presentation is in `frontend/public/graph.css`. Both are copied into `public_react/` by Vite.
+- The 2026-09-11 graph changes are CSS-only: clearer typography, controls, selector/inspector/tooltip surfaces, legend spacing, focus/hover states, and flexible header/workspace sizing.
+- Existing graph sampling, canvas category colors, node selection, neighbourhood highlighting, tooltip behavior, zoom/pan/fit, and loading/error/retry behavior were preserved.
+
+### HTML delivery and cache policy
+
+- `_send_react_index()` in `career_kg_web.py` sends the frontend entrypoint with `conditional=False`, `etag=False`, and `Cache-Control: no-store`.
+- Existing GET/HEAD `/index.html` requests use that policy through a narrowly scoped pre-request hook; OPTIONS and other static assets keep their prior handling.
+- Do not restore metadata-based conditional caching for this HTML: Vercel's normalized timestamps allow same-size builds to share validators while referencing different hashed assets.
+- This policy is in `dev` at `2d5b84b` and production through PR #12 merge `2e37d17`. Production headers and browser rendering were verified on 2026-09-11.
 
 ---
 
@@ -380,6 +392,21 @@ python evaluation/ranking_ablation.py       # fixed-query ranking diagnostic
 
 ## Verification Checklist
 
+Latest session verification (2026-09-11):
+
+```powershell
+.venv\Scripts\python.exe -m unittest discover -s tests -q
+# 154 tests passed after the HTML cache fix.
+.venv\Scripts\python.exe -m unittest discover -s tests -p test_frontend_html_cache.py -v
+# Four focused cache regression tests.
+```
+
+From `frontend/`, `npm.cmd run build` and `npm.cmd run lint` passed during the visual pass; lint retains one known warning. Browser fixtures passed 74 checks and sampled axe audits. The cache-only change did not modify or rebuild the frontend bundle.
+
+Production checks after PR #12 passed for `/` and `/index.html` with prior `If-None-Match` and `If-Modified-Since` headers: HTTP 200, fresh HTML, `Cache-Control: no-store`, and no ETag. Production browser load/reload with the old validators also passed. Retain these checks for future frontend deployments. Check cloud readiness independently; a rendered UI and HTTP 200 from `/api/status` do not establish that `ready` is true.
+
+The commands below are historical graph/API checks. In particular, the local pickle check predates the cloud migration; do not recreate local stores just to run it. Historical expected counts are not current runtime measurements.
+
 ```bash
 # Graph sanity
 python -c "
@@ -423,6 +450,9 @@ git push origin dev
 ---
 
 ## Known Issues / TODO
+
+- [x] Cache-fix PR #12 merged as `2e37d17`; production deployment `6400532594` passed. Old conditional headers now receive fresh 200/no-store HTML, and production browser load/reload renders correctly. Ctrl+Shift+R remains a one-time recovery option for an already-open stale page.
+- [ ] Investigate the separately observed production readiness state (`graph_loaded: false`, `qdrant_loaded: true`, `ready: false`, checked 2026-09-11) before claiming live recommendation availability. Database/recommendation behavior was not changed in this UI/cache session.
 
 - [ ] Coursera client scrapes HTML (no API key) — may break if Coursera changes their page structure
 - [ ] Knowledge graph viewer uses `cose` layout which is slow for >300 nodes — consider pre-computing layout positions and caching as JSON
