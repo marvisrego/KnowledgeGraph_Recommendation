@@ -33,8 +33,9 @@ production ranker, graph evidence, or promotion status.
   rule: skip same-quarter destinations and consecutive duplicate roles.
 - For a prefix ending at record `i`, the model may use roles through `i`, the
   final role's elapsed quarters (`end_quarter - start_quarter`, clipped and
-  bucketed), the gap from the preceding role's end to its start (clipped and
-  bucketed), and education recorded on or before `i`.
+  bucketed), and the gap from the preceding role's end to its start (clipped
+  and bucketed). Static résumé education is limited to a separately labelled
+  ablation because JobHop provides no education-completion dates.
 - It must never use the target role, its dates, later education, later roles,
   a person identifier, or a split label as a model feature.  Missing end dates
   are represented by an explicit missing-tenure bucket, not imputed from the
@@ -51,8 +52,12 @@ rankings.
 Validation compares three models under identical full-candidate evaluation:
 
 1. role-history-only causal Transformer;
-2. feature-aware Transformer without external pretraining;
-3. feature-aware Transformer with train-only JobHop pretraining when relevant.
+2. feature-aware Transformer using dated tenure and prior-gap features;
+3. an explicitly labelled static-résumé-education ablation.
+
+The primary JobHop metric is option 2. The education field is invariant within
+each résumé and has no completion date, so it is not represented as known at a
+historical prefix in the primary result.
 
 The selected model is ordered by MRR, Hit@5, and Hit@10.  No parameter grid,
 test peeking, or fusion search is permitted after test evaluation.
