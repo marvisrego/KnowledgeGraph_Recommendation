@@ -1128,3 +1128,69 @@ Post-merge production verification passed: `/` and `/index.html` returned HTTP 2
 A separate production readiness check returned HTTP 200 from `/api/status` with `ready: false`, `graph_loaded: false`, `qdrant_loaded: true`, and zero loaded nodes/edges. The graph-readiness cause was not investigated or changed during this session. Earlier successful cloud validation remains historical evidence, not proof of present recommendation availability.
 
 Local research and test artifacts are under `C:/Users/marvi/AppData/Local/Temp/career-ui-research/`, including `before-welcome.png`, `after-welcome.png`, `after-mobile.png`, `before.json`, `after.json`, accessibility JSON reports, `verify.cjs`, `edge-check.cjs`, `reproduced-cached-white-screen.png`, and `cache-fix-verified.png`. These files are temporary and uncommitted; populated UI captures use browser-only sample data.
+
+## 2026-09-12 — Empirical TES and full-candidate ranking groundwork
+
+- Added validated TES calibration artifacts, trajectory-proxy calibration CLI, hierarchical ISCO distance, evidence-aware TES renormalization, and transparent heuristic time-estimate metadata.
+- Added a count-aware empirical-Bayes smoother option that is disabled until validation selects a prior strength; legacy smoothing remains the default.
+- Added person-prefix full-candidate benchmark utilities, offline reduced MLP/STEP training, and a research-only unfiltered RotatE benchmark. Artifacts are unpromoted by default and cannot load in production.
+- Added conservative ordered career-history extraction and sequential transition-channel fusion. The external `/api/chat` request body remains unchanged.
+- Added `docs/ALGORITHMS.md`, updated runtime configuration and Vercel artifact inclusion, and added unit coverage for calibration, history resolution, sequential artifact safety, adaptive smoothing, and transition fusion.
+- No files in `Writing/` were changed and no ranking artifact was promoted without a held-out result.
+
+---
+
+## Session Changes (2026-09-14): causal trajectory-ranking investigation
+
+1. Kept the evaluation task strict: person-disjoint Karrierewege prefixes,
+   complete live ESCO candidate set (3,039 roles), current-role exclusion, and
+   train-only transition evidence.
+2. Added an occupation-ID residual to the causal Transformer and used JobHop
+   only for external sequence pretraining. No JobHop person-level fields are
+   copied into Karrierewege, artifacts, or runtime requests.
+3. Seed 17 reached validation MRR `0.310101`, Hits@5 `0.433727`, Hits@10
+   `0.565431`, and coverage `1.0`. Its validation-only fusion reached MRR
+   `0.312508`, Hits@5 `0.435622`, Hits@10 `0.566758`.
+4. The seed-17 standalone test diagnostic reached MRR `0.310800`, Hits@5
+   `0.433687`, Hits@10 `0.563050`; it is disclosed as already observed before
+   multi-seed selection and is not used to choose a model or claim promotion.
+5. Seed 29 completed at validation MRR `0.309984`, Hits@5 `0.432659`,
+   Hits@10 `0.564953`. The fixed seeds 41, 53, and 71 continue sequentially;
+   selection is validation-only with MRR, then Hits@5, then Hits@10.
+6. The isolated JobHop feature-aware benchmark produced test Hits@10 `0.318897`
+   and MRR `0.161371`. It is a separate dataset result and was rejected as a
+   path to the Karrierewege target.
+7. Added artifact-validation, promotion, frozen-fusion, and runtime-parity
+   safeguards. An unpromoted seed-17 artifact measured 20.7 MB, p50 `32.1 ms`,
+   p95 `32.4 ms` for top-50 local ranking. This does not establish API latency.
+8. `SEQUENTIAL_RANKING_ENABLED=false` remains the production setting. The
+   requested 60-65% Hits@10 target has not been achieved: the best current
+   validation result is 56.68%. Finish the fixed multi-seed and frozen-test
+   gates before changing runtime behavior.
+
+---
+
+## Session Changes (2026-09-15): seed-41 validation selection and frozen test
+
+1. Completed seed 41 and seed 53; together with completed seeds 17 and 29,
+   they form the recorded four-seed validation stability set. The planned seed
+   71 was stopped before artifact creation at the user's direction.
+2. Seed 41 won validation selection by MRR, then Hits@5, then Hits@10: MRR
+   `0.310251`, Hits@5 `0.434165`, Hits@10 `0.564143`. Across four seeds, MRR
+   standard deviation was `0.000113`.
+3. Ran validation-only full-candidate fusion and froze its checksum-bound
+   manifest before reading seed 41's test split. Selected weights were
+   single-role `(0.5 neural, 0.5 smoother, 0.0 second-order)` and multi-role
+   `(1.0, 0.0, 0.0)`.
+4. The single frozen test measured MRR `0.313438`, Hits@1 `0.194219`, Hits@3
+   `0.351234`, Hits@5 `0.435648`, Hits@10 `0.564807`, NDCG@10 `0.361146`, and
+   coverage `1.0` over 122,918 prefixes and 3,039 candidates. Relative to the
+   semantic smoother, Hits@10 improved `+0.058950` (paired person-bootstrap
+   95% CI `[0.057016, 0.060774]`); MRR improved `+0.051597` (CI
+   `[0.050245, 0.052923]`).
+5. Full regression verification passed: 182 tests, `pip check`, compileall,
+   and local runtime measurement (20.7 MB; load `143.3 ms`; top-50 p50
+   `31.5 ms`, p95 `32.5 ms`).
+6. Production remains unchanged. The final 56.48% Hits@10 is below the
+   requested 60-65% threshold, so no artifact was promoted and
+   `SEQUENTIAL_RANKING_ENABLED=false` remains mandatory.

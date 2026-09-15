@@ -3,3 +3,5 @@
 # Cloud/offline link-prediction training only; not installed by Vercel.
 lightgbm>=4.0
 scikit-learn>=1.5
+# Offline only: used by sequential full-candidate and RotatE experiments.
+torch>=2.4,<3

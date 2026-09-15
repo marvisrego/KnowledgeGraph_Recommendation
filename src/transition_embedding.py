@@ -28,6 +28,9 @@ class SmoothingConfig:
     neighbours: int
     direct_weight: float
     temperature: float
+    # ``None`` preserves the accepted historic fixed-weight mixture. A positive
+    # value enables the empirically-Bayesian count-aware formulation below.
+    prior_strength: float | None = None
 
     def __post_init__(self) -> None:
         if self.neighbours < 1:
@@ -36,12 +39,20 @@ class SmoothingConfig:
             raise ValueError("direct_weight must be between 0 and 1")
         if self.temperature <= 0.0 or not math.isfinite(self.temperature):
             raise ValueError("temperature must be a positive finite number")
+        if self.prior_strength is not None and (
+            self.prior_strength <= 0.0 or not math.isfinite(self.prior_strength)
+        ):
+            raise ValueError("prior_strength must be a positive finite number or None")
 
     def to_dict(self) -> dict[str, int | float]:
         return {
             "neighbours": self.neighbours,
             "direct_weight": self.direct_weight,
             "temperature": self.temperature,
+            "prior_strength": self.prior_strength,
+            "strategy": (
+                "empirical_bayes" if self.prior_strength is not None else "fixed_weight"
+            ),
         }
 
 
@@ -346,7 +357,7 @@ def rank_hybrid_destinations(
 
     has_direct = bool(direct)
     has_neighbour = bool(neighbour_probability)
-    if has_direct and has_neighbour:
+    if has_direct and has_neighbour and config.prior_strength is None:
         direct_weight = config.direct_weight
         neighbour_weight = 1.0 - config.direct_weight
     elif has_direct:
@@ -361,7 +372,19 @@ def rank_hybrid_destinations(
     for destination_id in candidates:
         direct_value = direct.get(destination_id, TransitionValue(0.0, 0, 0))
         neighbour_value = neighbour_probability.get(destination_id, 0.0)
-        score = direct_weight * direct_value.probability + neighbour_weight * neighbour_value
+        if config.prior_strength is not None and has_direct and has_neighbour:
+            # Empirical-Bayes shrinkage: observed counts are the likelihood and
+            # the semantically smoothed distribution is the prior. This avoids
+            # a global direct-weight that over-trusts low-support sources while
+            # retaining strong direct evidence for well-observed sources.
+            source_total = max(
+                (item.source_total for item in direct.values()),
+                default=0,
+            )
+            alpha = config.prior_strength
+            score = (direct_value.count + alpha * neighbour_value) / (source_total + alpha)
+        else:
+            score = direct_weight * direct_value.probability + neighbour_weight * neighbour_value
         if score <= 0.0 or not math.isfinite(score):
             continue
         scored.append(

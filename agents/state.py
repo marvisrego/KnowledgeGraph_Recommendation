@@ -23,6 +23,7 @@ class CareerAgentState(TypedDict, total=False):
     # Skill/role evidence
     skill_evidence: dict[str, Any]
     current_role_id: str | None
+    history_role_ids: list[str]
     owned_skill_ids: set[str]
 
     # Retrieval

@@ -19,6 +19,7 @@ import networkx as nx
 
 from src.kg_enrichment import compute_skill_idf
 from src.skill_gap import role_requirements
+from src.tes_calibration import TESCalibration, default_calibration
 from src.transition_policy import is_training_transition
 
 if TYPE_CHECKING:
@@ -42,11 +43,12 @@ class EffortWeights:
 class EffortResult:
     score: float
     band: str
-    skill_gap_magnitude: float
-    domain_distance: float
+    skill_gap_magnitude: float | None
+    domain_distance: float | None
     empirical_support: float
-    transferability: float
+    transferability: float | None
     weights: EffortWeights
+    calibration: TESCalibration
     estimated_weeks_min: int = 0
     estimated_weeks_max: int = 0
 
@@ -56,12 +58,14 @@ class EffortResult:
             "effort_band": self.band,
             "estimated_weeks_min": self.estimated_weeks_min,
             "estimated_weeks_max": self.estimated_weeks_max,
+            "estimated_weeks_basis": "heuristic",
             "components": {
-                "skill_gap_magnitude": round(self.skill_gap_magnitude, 4),
-                "domain_distance": round(self.domain_distance, 4),
+                "skill_gap_magnitude": _round_or_none(self.skill_gap_magnitude),
+                "domain_distance": _round_or_none(self.domain_distance),
                 "empirical_support": round(self.empirical_support, 4),
-                "transferability": round(self.transferability, 4),
+                "transferability": _round_or_none(self.transferability),
             },
+            "calibration": self.calibration.to_dict(),
         }
 
 
@@ -84,11 +88,16 @@ def estimate_upskill_weeks(missing_count: int, band: str) -> tuple[int, int]:
     return _BAND_WEEKS.get(band, (4, 12))
 
 
-def effort_band(score: float) -> str:
+def _round_or_none(value: float | None) -> float | None:
+    return round(value, 4) if value is not None else None
+
+
+def effort_band(score: float, calibration: TESCalibration | None = None) -> str:
     """Classify effort score into human-readable band."""
-    if score <= 0.3:
+    calibration = calibration or default_calibration()
+    if score <= calibration.low_max:
         return "low"
-    if score <= 0.6:
+    if score <= calibration.moderate_max:
         return "moderate"
     return "high"
 
@@ -113,14 +122,17 @@ def skill_gap_magnitude(
     owned_skills: set[str],
     target_required: set[str],
     idf_map: dict[str, float],
-) -> float:
+) -> float | None:
     """IDF-weighted fraction of skills the user is missing.
 
     Returns 0.0 if user has all required skills, 1.0 if they have none.
-    Returns 1.0 if target has no requirements (maximally uncertain).
+    Returns ``None`` when target requirements are unavailable. Missing evidence
+    must not be converted into maximum difficulty.
     """
     if not target_required:
-        return 1.0
+        return None
+    if not owned_skills:
+        return None
     missing = target_required - owned_skills
     if not missing:
         return 0.0
@@ -134,28 +146,37 @@ def domain_distance(
     source_id: str,
     target_id: str,
     G: nx.MultiDiGraph,
-) -> float:
+) -> float | None:
     """ISCO Jaccard distance between two roles.
 
     Returns 0.0 if same ISCO 2-digit group, 1.0 if completely different.
-    Returns 0.5 (neutral) if ISCO codes are unavailable for either role.
+    Returns ``None`` if ISCO codes are unavailable for either role.
     """
-    source_isco = G.nodes.get(source_id, {}).get("isco_2digit")
-    target_isco = G.nodes.get(target_id, {}).get("isco_2digit")
+    source_isco = str(
+        G.nodes.get(source_id, {}).get("isco_group")
+        or G.nodes.get(source_id, {}).get("isco_2digit")
+        or ""
+    )
+    target_isco = str(
+        G.nodes.get(target_id, {}).get("isco_group")
+        or G.nodes.get(target_id, {}).get("isco_2digit")
+        or ""
+    )
 
     if not source_isco or not target_isco:
-        return 0.5
+        return None
+    if source_isco == target_isco:
+        return 0.0
 
-    source_set = {source_isco}
-    target_set = {target_isco}
-
-    intersection = source_set & target_set
-    union = source_set | target_set
-
-    if not union:
-        return 0.5
-
-    return 1.0 - len(intersection) / len(union)
+    # ISCO is hierarchical: sharing 3, 2, or 1 leading digits means the roles
+    # are progressively closer. The graph may only have a 2-digit fallback.
+    common = 0
+    for source_digit, target_digit in zip(source_isco, target_isco):
+        if source_digit != target_digit:
+            break
+        common += 1
+    depth = min(4, max(len(source_isco), len(target_isco)))
+    return 1.0 - min(common, depth) / depth
 
 
 def empirical_support(
@@ -163,11 +184,13 @@ def empirical_support(
     target_id: str,
     G: nx.MultiDiGraph,
     smoother: "RuntimeTransitionSmoother | None" = None,
-) -> float:
+) -> float | None:
     """Evidence that people actually make this career transition.
 
     Returns 0.0 (no evidence) to 1.0 (strong observed evidence).
     """
+    if not G.has_node(source_id) or not G.has_node(target_id):
+        return 0.0
     best_prob = 0.0
     best_count = 0
     for _, target, data in G.out_edges(source_id, data=True):
@@ -202,7 +225,7 @@ def transferability(
     G: nx.MultiDiGraph,
     idf_map: dict[str, float],
     onet_importance_threshold: float = 3.5,
-) -> float:
+) -> float | None:
     """IDF-weighted fraction of target skills that the source role also requires.
 
     High transferability = many rare skills transfer from source to target.
@@ -215,7 +238,7 @@ def transferability(
     )
 
     if not target_skills:
-        return 0.0
+        return None
 
     shared = source_skills & target_skills
     if not shared:
@@ -237,6 +260,7 @@ def transition_effort_score(
     weights: EffortWeights | None = None,
     smoother: "RuntimeTransitionSmoother | None" = None,
     onet_importance_threshold: float = 3.5,
+    calibration: TESCalibration | None = None,
 ) -> EffortResult:
     """Compute the full Transition Effort Score for a source→target pair.
 
@@ -251,8 +275,14 @@ def transition_effort_score(
     """
     if idf_map is None:
         idf_map = get_idf_map(G)
+    calibration = calibration or default_calibration()
     if weights is None:
-        weights = EffortWeights()
+        weights = EffortWeights(
+            skill_gap=calibration.weights["skill_gap"],
+            domain=calibration.weights["domain"],
+            empirical=calibration.weights["empirical"],
+            transferability=calibration.weights["transferability"],
+        )
 
     target_required, _, _ = role_requirements(
         target_id, G, onet_importance_threshold
@@ -265,15 +295,20 @@ def transition_effort_score(
         source_id, target_id, G, idf_map, onet_importance_threshold
     )
 
-    score = (
-        weights.skill_gap * sgm
-        + weights.domain * dd
-        + weights.empirical * (1.0 - es)
-        + weights.transferability * (1.0 - tf)
+    components = (
+        (weights.skill_gap, sgm),
+        (weights.domain, dd),
+        (weights.empirical, 1.0 - es),
+        (weights.transferability, None if tf is None else 1.0 - tf),
     )
+    available = [(weight, value) for weight, value in components if value is not None]
+    if not available:
+        raise ValueError("Transition effort has no available evidence components")
+    available_weight = sum(weight for weight, _ in available)
+    score = sum(weight * float(value) for weight, value in available) / available_weight
 
     score = max(0.0, min(1.0, score))
-    band = effort_band(score)
+    band = effort_band(score, calibration)
 
     missing_count = len(target_required - owned_skills) if target_required else 0
     weeks_min, weeks_max = estimate_upskill_weeks(missing_count, band)
@@ -286,6 +321,7 @@ def transition_effort_score(
         empirical_support=es,
         transferability=tf,
         weights=weights,
+        calibration=calibration,
         estimated_weeks_min=weeks_min,
         estimated_weeks_max=weeks_max,
     )
@@ -300,6 +336,7 @@ def rank_roles_by_effort(
     weights: EffortWeights | None = None,
     smoother: "RuntimeTransitionSmoother | None" = None,
     onet_importance_threshold: float = 3.5,
+    calibration: TESCalibration | None = None,
 ) -> list[dict]:
     """Annotate candidates with TES and sort by effort (low effort first).
 
@@ -308,7 +345,13 @@ def rank_roles_by_effort(
     if idf_map is None:
         idf_map = get_idf_map(G)
     if weights is None:
-        weights = EffortWeights()
+        selected = calibration or default_calibration()
+        weights = EffortWeights(
+            skill_gap=selected.weights["skill_gap"],
+            domain=selected.weights["domain"],
+            empirical=selected.weights["empirical"],
+            transferability=selected.weights["transferability"],
+        )
 
     annotated: list[dict] = []
     for candidate in candidates:
@@ -325,6 +368,7 @@ def rank_roles_by_effort(
                 weights,
                 smoother,
                 onet_importance_threshold,
+                calibration,
             )
             enriched["effort"] = result.to_dict()
         else:

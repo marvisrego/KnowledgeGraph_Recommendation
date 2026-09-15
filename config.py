@@ -78,6 +78,7 @@ class Settings:
     transition_smoothing_neighbours: int
     transition_smoothing_direct_weight: float
     transition_smoothing_temperature: float
+    transition_smoothing_prior_strength: float | None
     karrierewege_max_invalid_row_ratio: float
 
     # --- Transition Effort Score ---
@@ -85,10 +86,15 @@ class Settings:
     effort_weight_domain: float
     effort_weight_empirical: float
     effort_weight_transferability: float
+    effort_calibration_path: Path
 
     # --- Link Prediction ---
     link_prediction_enabled: bool
     link_prediction_model_path: Path
+
+    # --- Offline-trained sequential transition ranking ---
+    sequential_ranking_enabled: bool
+    sequential_ranking_artifact_path: Path
 
     # --- Agent orchestration ---
     use_langgraph: bool
@@ -176,6 +182,11 @@ class Settings:
             transition_smoothing_temperature=float(
                 os.getenv("TRANSITION_SMOOTHING_TEMPERATURE", "0.06")
             ),
+            transition_smoothing_prior_strength=(
+                float(os.environ["TRANSITION_SMOOTHING_PRIOR_STRENGTH"])
+                if os.getenv("TRANSITION_SMOOTHING_PRIOR_STRENGTH")
+                else None
+            ),
             karrierewege_max_invalid_row_ratio=float(
                 os.getenv("KARRIEREWEGE_MAX_INVALID_ROW_RATIO", "0.001")
             ),
@@ -184,9 +195,20 @@ class Settings:
             effort_weight_domain=float(os.getenv("EFFORT_WEIGHT_DOMAIN", "0.15")),
             effort_weight_empirical=float(os.getenv("EFFORT_WEIGHT_EMPIRICAL", "0.25")),
             effort_weight_transferability=float(os.getenv("EFFORT_WEIGHT_TRANSFERABILITY", "0.25")),
+            effort_calibration_path=_path(
+                "EFFORT_CALIBRATION_PATH",
+                "artifacts/transition_effort/tes_calibration.json",
+            ),
             # Link prediction
             link_prediction_enabled=_bool("LINK_PREDICTION_ENABLED", True),
             link_prediction_model_path=_path("LINK_PREDICTION_MODEL_PATH", "artifacts/link_prediction/link_predictor.json"),
+            # Sequential ranking is opt-in: an artifact must have passed its
+            # held-out promotion gate before serverless inference may load it.
+            sequential_ranking_enabled=_bool("SEQUENTIAL_RANKING_ENABLED", False),
+            sequential_ranking_artifact_path=_path(
+                "SEQUENTIAL_RANKING_ARTIFACT_PATH",
+                "artifacts/sequential_ranking/sequential_ranker.npz",
+            ),
             # Agent orchestration
             use_langgraph=_bool("USE_LANGGRAPH", True),
         )

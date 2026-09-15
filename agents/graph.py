@@ -62,6 +62,7 @@ def build_career_graph(
     collection,
     transition_smoother=None,
     link_prediction_runtime=None,
+    sequential_runtime=None,
 ) -> StateGraph:
     """Construct the LangGraph workflow with injected dependencies.
 
@@ -76,6 +77,7 @@ def build_career_graph(
         collection=collection,
         transition_smoother=transition_smoother,
         link_prediction_runtime=link_prediction_runtime,
+        sequential_runtime=sequential_runtime,
     )
     ranking = partial(ranking_node, settings=settings, G=G)
     qualification = partial(qualification_node, settings=settings, G=G)
@@ -148,6 +150,7 @@ def run_career_workflow(
     collection,
     transition_smoother=None,
     link_prediction_runtime=None,
+    sequential_runtime=None,
 ) -> dict:
     """Execute the full career advisor workflow and return the response dict.
 
@@ -162,6 +165,7 @@ def run_career_workflow(
         collection,
         transition_smoother,
         link_prediction_runtime,
+        sequential_runtime,
     )
 
     initial_state: CareerAgentState = {

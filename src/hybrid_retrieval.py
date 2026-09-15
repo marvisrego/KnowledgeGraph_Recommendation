@@ -22,6 +22,7 @@ from src.skill_gap import role_requirements
 _TRANSITION_PRIORITY = {
     "predicted_transition": 1,
     "semantic_transition_backoff": 2,
+    "sequential_transition": 2,
     "direct_transition": 3,
 }
 
@@ -297,6 +298,65 @@ def reciprocal_rank_fusion(
     return results
 
 
+def fuse_transition_candidates(
+    transition_candidates: Sequence[dict],
+    sequential_predictions: Sequence[object],
+    sequential_weight: float,
+    G: nx.MultiDiGraph,
+    limit: int,
+) -> list[dict]:
+    """Fuse smoother and sequential rankings before outer retrieval fusion.
+
+    Scores are rank-based so the two models need not share calibrated numeric
+    ranges. Existing direct-transition evidence remains the explanation when a
+    role occurs in both lists.
+    """
+    if limit <= 0:
+        return []
+    sequential_weight = min(1.0, max(0.0, float(sequential_weight)))
+    smoother_weight = 1.0 - sequential_weight
+    by_id: dict[str, dict] = {str(item["id"]): dict(item) for item in transition_candidates}
+    scores: dict[str, float] = {}
+    source_sets: dict[str, set[str]] = {}
+
+    for rank, item in enumerate(transition_candidates, start=1):
+        role_id = str(item["id"])
+        scores[role_id] = scores.get(role_id, 0.0) + smoother_weight / (60 + rank)
+        source_sets.setdefault(role_id, set()).update(item.get("retrieval_sources", []))
+
+    for rank, prediction in enumerate(sequential_predictions, start=1):
+        role_id = str(getattr(prediction, "role_id", ""))
+        if not role_id or not G.has_node(role_id):
+            continue
+        scores[role_id] = scores.get(role_id, 0.0) + sequential_weight / (60 + rank)
+        source_sets.setdefault(role_id, set()).add("sequential_transition")
+        if role_id not in by_id:
+            by_id[role_id] = _role_candidate(
+                role_id,
+                G,
+                score=float(getattr(prediction, "score", 0.0)),
+                source="sequential_transition",
+                retrieval_sources=["sequential_transition"],
+                transition={
+                    "from_role_id": None,
+                    "evidence_type": "sequential_transition",
+                    "score": float(getattr(prediction, "score", 0.0)),
+                    "model": str(getattr(prediction, "model", "sequential")),
+                    "history_length": int(getattr(prediction, "history_length", 0)),
+                },
+            )
+
+    ranked_ids = sorted(scores, key=lambda role_id: (-scores[role_id], role_id))[:limit]
+    result: list[dict] = []
+    for role_id in ranked_ids:
+        item = dict(by_id[role_id])
+        item["score"] = scores[role_id]
+        item["source"] = "transition_hybrid"
+        item["retrieval_sources"] = sorted(source_sets.get(role_id, set()))
+        result.append(item)
+    return result
+
+
 def hybrid_retrieve(
     query: str,
     collection,
@@ -306,6 +366,8 @@ def hybrid_retrieve(
     settings,
     transition_smoother=None,
     link_prediction_runtime: LinkPredictionRuntime | None = None,
+    sequential_runtime=None,
+    history_role_ids: Sequence[str] | None = None,
     vector_top_k: int | None = None,
     graph_top_k: int = 20,
     lp_top_k: int = 20,
@@ -366,6 +428,24 @@ def hybrid_retrieve(
                     "probability", (candidate.get("transition") or {}).get("score", 0.0)
                 )
             )
+        if sequential_runtime is not None and history_role_ids:
+            try:
+                sequential_predictions = sequential_runtime.rank(
+                    list(history_role_ids),
+                    max(settings.transition_candidate_limit * 4, 50),
+                )
+                if sequential_predictions:
+                    transition_candidates = fuse_transition_candidates(
+                        transition_candidates,
+                        sequential_predictions,
+                        sequential_runtime.fusion_weight(len(history_role_ids)),
+                        G,
+                        settings.transition_candidate_limit,
+                    )
+            except Exception:
+                # A promoted artifact is optional; its failure must not remove
+                # accepted direct/semantic recommendations.
+                pass
         if transition_candidates:
             sources.append(transition_candidates)
 

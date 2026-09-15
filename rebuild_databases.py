@@ -74,6 +74,7 @@ def _evaluate_prepared_graph(graph, points, settings, split_files, title_index) 
         settings.transition_smoothing_neighbours,
         settings.transition_smoothing_direct_weight,
         settings.transition_smoothing_temperature,
+        settings.transition_smoothing_prior_strength,
     )
     results = {}
     for split in ("validation", "test"):

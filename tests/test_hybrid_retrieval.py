@@ -13,6 +13,7 @@ from src.link_prediction import FEATURE_NAMES
 from src.hybrid_retrieval import (
     LinkPredictionRuntime,
     combine_prediction_maps,
+    fuse_transition_candidates,
     graph_retrieve,
     hybrid_retrieve,
     reciprocal_rank_fusion,
@@ -193,6 +194,25 @@ class HybridRetrievalTests(unittest.TestCase):
             lp_map={"source": ["predicted"]},
         )
         self.assertEqual(combined["source"], ["smoothed", "direct"])
+
+    def test_sequential_fusion_happens_inside_transition_channel(self) -> None:
+        class Prediction:
+            role_id = "predicted"
+            score = 0.8
+            model = "step_gru"
+            history_length = 2
+
+        graph = _graph()
+        fused = fuse_transition_candidates(
+            [{"id": "direct", "score": 0.9, "source": "direct_transition", "retrieval_sources": ["direct_transition"], "transition": {"evidence_type": "direct_transition"}}],
+            [Prediction()],
+            sequential_weight=0.5,
+            G=graph,
+            limit=5,
+        )
+        by_id = {item["id"]: item for item in fused}
+        self.assertIn("sequential_transition", by_id["predicted"]["retrieval_sources"])
+        self.assertEqual(by_id["direct"]["transition"]["evidence_type"], "direct_transition")
 
 
 if __name__ == "__main__":

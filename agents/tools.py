@@ -104,6 +104,7 @@ def calculate_skill_gap(
         return {"error": f"Role not found: {role_phrase}"}
 
     from src.skill_gap import resolve_user_skills
+    from src.tes_calibration import load_calibration
     evidence = resolve_user_skills(user_skills, user_skills, G)
     gap = compute_skill_gap(evidence["skill_ids"], role_id, G)
     return {
@@ -135,17 +136,13 @@ def calculate_effort(
     evidence = resolve_user_skills(user_skills, user_skills, G)
     idf_map = get_idf_map(G)
 
-    weights = EffortWeights()
-    if settings:
-        weights = EffortWeights(
-            skill_gap=settings.effort_weight_skill_gap,
-            domain=settings.effort_weight_domain,
-            empirical=settings.effort_weight_empirical,
-            transferability=settings.effort_weight_transferability,
-        )
+    calibration = load_calibration(
+        settings.effort_calibration_path if settings else None
+    )
 
     result = transition_effort_score(
-        source_id, target_id, evidence["skill_ids"], G, idf_map, weights
+        source_id, target_id, evidence["skill_ids"], G, idf_map, None,
+        calibration=calibration,
     )
 
     return {

@@ -670,3 +670,70 @@ This section records the August 15 checkpoints. The current 2026-08-27 metrics, 
 - Delivery completed: PR #7 merged the workflow and deployment cleanup into `main`; Actions run `33975475939` completed successfully in 2m57s; its validated model PR #8 passed Vercel preview and was merged into `dev` as `32ce418`.
 - First GitHub-hosted result: AUC `0.883507`, AP `0.702902`, Hits@1 `0.713725`, Hits@3 `0.853595`, Hits@5 `0.911111`, Hits@10 `0.949020`, and MRR `0.797201`. These source-grouped sampled-negative metrics passed every publication gate and remain separate from the official held-out Karrierewege benchmark.
 - Final public validation passed: `/` returned the React app, `/api/status` reported Aura, Qdrant, smoothing, and link prediction ready with 19,241 nodes, 240,906 relationships, and 18,907 train transitions, and a representative `/api/chat` request returned HTTP 200 with a structured career path and no error.
+
+### Empirical TES and ranking implementation (2026-09-12)
+
+- `src/tes_calibration.py` validates portable, versioned TES calibration artifacts; absent or invalid artifacts safely use labelled legacy values. `evaluation/calibrate_transition_effort.py` fits train-only, inverse-stratum-weighted trajectory-choice proxy weights and learns effort-band boundaries on validation only.
+- TES now treats absent skills, requirements, or ISCO data as unavailable evidence instead of maximum difficulty; it renormalizes available components and exposes calibration metadata plus the existing estimate's `heuristic` basis.
+- `SmoothingConfig.prior_strength` enables empirical-Bayes count-aware shrinkage while an unset value retains the accepted fixed-weight behaviour. Tune `k`, temperature, and prior strength only with the offline prefix benchmark.
+- `src/sequential_ranking.py` provides dependency-free runtime inference for promoted MLP/STEP artifacts. Internal intent extraction resolves only user-stated ordered career history; sequential candidates are fused inside the transition channel and cannot replace the smoother if the artifact is absent, invalid, or unpromoted.
+- `evaluation/export_sequential_embeddings.py`, `evaluation/train_sequential_ranker.py`, `evaluation/evaluate_prefix_ranking.py`, and `evaluation/train_rotate_link_prediction.py` are offline research tools. They use an existing local graph if present, otherwise read AuraDB/Qdrant without writes. No learned artifact was generated or promoted in this delivery, so `SEQUENTIAL_RANKING_ENABLED` remains false.
+- `docs/ALGORITHMS.md` contains the required algorithm steps and equations. `Writing/` was not modified.
+
+## 2026-09-14 - Causal trajectory ranking, stability gate, and runtime safety
+
+- The primary evaluation remains a person-disjoint Karrierewege prefix task:
+  rank every live ESCO v1.2.1 occupation, exclude the current role, and derive
+  all transition evidence from the training split only.
+- A causal Transformer with a learned occupation-ID residual was pretrained on
+  JobHop v2 training records and fine-tuned on Karrierewege training data. It
+  achieved validation MRR `0.310101`, Hits@5 `0.433727`, Hits@10 `0.565431`
+  (seed 17, 123,520 prefixes, coverage `1.0`). A validation-only frozen fusion
+  reached MRR `0.312508`, Hits@5 `0.435622`, Hits@10 `0.566758`.
+- Its recorded standalone test diagnostic was MRR `0.310800`, Hits@5
+  `0.433687`, Hits@10 `0.563050` (122,918 prefixes, coverage `1.0`). This test
+  result must not be treated as a newly blind promotion test because it was
+  observed before multi-seed selection finished.
+- Seed 29 completed with validation MRR `0.309984`, Hits@5 `0.432659`, and
+  Hits@10 `0.564953`; seed 17 is the provisional validation leader. The fixed
+  remaining seeds 41, 53, and 71 are running sequentially. No seed is chosen
+  from test performance.
+- JobHop personal source fields (dates, tenure, education, companies,
+  locations, and individual skills) are not transferred into Karrierewege or
+  production. The isolated JobHop feature-aware test benchmark (Hits@10
+  `0.318897`, MRR `0.161371`) is not comparable to, and is not fused with, the
+  primary Karrierewege metric.
+- Added a dependency-free runtime implementation for the causal artifact, a
+  checksum-bound promotion tool, and a frozen-fusion test evaluator. Local
+  inference for the unpromoted 20.7 MB seed-17 artifact measured p50 `32.1 ms`
+  and p95 `32.4 ms` for top-50 ranking; this is runtime-only, not end-to-end
+  API latency. `SEQUENTIAL_RANKING_ENABLED` remains `false`.
+- Promotion remains blocked until the fixed multi-seed selection, frozen
+  full-candidate fusion test, person-bootstrap evidence, artifact/API checks,
+  and an explicit blind-test disclosure all pass. The current best Hits@10 is
+  still below the requested 60-65% target; do not claim otherwise.
+
+## 2026-09-15 - Seed-41 frozen fusion result
+
+- Completed four validation-only seeds (`17`, `29`, `41`, `53`). The user
+  stopped the planned seed `71` before it produced an artifact, so do not
+  describe this as a five-seed result. Seed 41 won the declared ordering
+  (MRR, Hits@5, Hits@10) with validation MRR `0.310251`, Hits@5 `0.434165`,
+  Hits@10 `0.564143`. The four-seed MRR standard deviation was `0.000113`.
+- Seed 41's checksum-bound validation fusion selected `(0.5, 0.5, 0.0)` for
+  `(neural, smoother, second-order)` on single-role histories and `(1.0, 0.0,
+  0.0)` on multi-role histories. It produced validation MRR `0.312526`,
+  Hits@5 `0.435962`, Hits@10 `0.565819`.
+- The seed-41 test was read once after the manifest freeze: MRR `0.313438`,
+  Hits@1 `0.194219`, Hits@3 `0.351234`, Hits@5 `0.435648`, Hits@10
+  `0.564807`, NDCG@10 `0.361146`, coverage `1.0` (122,918 prefixes / 56,848
+  people / 3,039 live candidates). Against the semantic smoother, deltas were
+  MRR `+0.051597`, Hits@5 `+0.063367`, Hits@10 `+0.058950`; their paired
+  person-bootstrap 95% intervals exclude zero.
+- The 20.7 MB unpromoted seed-41 artifact loaded in `143.3 ms`; local top-50
+  ranking p50 was `31.5 ms`, p95 `32.5 ms`. The full unit suite passed (182
+  tests), `pip check` passed, and compilation passed. These are local checks,
+  not a live API latency claim.
+- `SEQUENTIAL_RANKING_ENABLED` remains `false` and no deployable artifact was
+  created: final Hits@10 `0.564807` still does not meet the requested 0.60-0.65
+  threshold. The semantic smoother remains production behavior.
