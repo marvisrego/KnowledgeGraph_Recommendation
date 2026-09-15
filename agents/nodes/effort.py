@@ -10,7 +10,8 @@ from agents.state import CareerAgentState
 
 def effort_node(state: CareerAgentState, *, settings, G, transition_smoother=None, **kwargs) -> dict[str, Any]:
     """Compute Transition Effort Score for each role in the path."""
-    from src.transition_effort import transition_effort_score, get_idf_map, EffortWeights
+    from src.transition_effort import transition_effort_score, get_idf_map
+    from src.tes_calibration import load_calibration
     from src.inference_pipeline import _build_path_data
 
     t0 = time.time()
@@ -33,12 +34,7 @@ def effort_node(state: CareerAgentState, *, settings, G, transition_smoother=Non
 
     if effective_source_id and roles:
         idf_map = get_idf_map(G)
-        weights = EffortWeights(
-            skill_gap=settings.effort_weight_skill_gap,
-            domain=settings.effort_weight_domain,
-            empirical=settings.effort_weight_empirical,
-            transferability=settings.effort_weight_transferability,
-        )
+        calibration = load_calibration(settings.effort_calibration_path)
         for role_entry in roles:
             target_id = role_entry["id"]
             if target_id == effective_source_id:
@@ -50,15 +46,18 @@ def effort_node(state: CareerAgentState, *, settings, G, transition_smoother=Non
                     owned_skill_ids,
                     G,
                     idf_map,
-                    weights,
+                    None,
                     transition_smoother,
                     settings.onet_importance_threshold,
+                    calibration,
                 )
                 role_entry["effort_score"] = round(effort.score, 4)
                 role_entry["effort_band"] = effort.band
                 role_entry["effort_source"] = effort_source_label
                 role_entry["estimated_weeks_min"] = effort.estimated_weeks_min
                 role_entry["estimated_weeks_max"] = effort.estimated_weeks_max
+                role_entry["estimated_weeks_basis"] = "heuristic"
+                role_entry["effort_calibration"] = effort.calibration.to_dict()
             except Exception as exc:
                 print(f"[effort_node] Skipping effort for {target_id}: {exc}")
 

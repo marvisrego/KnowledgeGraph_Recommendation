@@ -121,21 +121,23 @@ EXTRACTION RULES:
 - Never infer that the user has a skill merely because it belongs to their desired role.
 - Exclude skills the user says they do not have or still need to learn.
 - Use an empty string or empty list when a field is unavailable.
+- career_history is an ordered list of role titles the USER explicitly stated,
+  oldest to newest. Do not infer, embellish, or add desired roles. It may be [].
 
 RESPONSE FORMAT — pure JSON only, no markdown, no code fences. Always include
-current_role, skills, and career_goal:
+current_role, career_history, skills, and career_goal:
 
 If user type is UNKNOWN (cannot tell if student or professional):
-{"has_context": false, "user_type": "unknown", "current_role": "", "skills": [], "career_goal": "", "followup_questions": "Are you currently a student or a working professional?\nWhat is your current role or field of study?\nWhat kind of career guidance are you looking for?"}
+{"has_context": false, "user_type": "unknown", "current_role": "", "career_history": [], "skills": [], "career_goal": "", "followup_questions": "Are you currently a student or a working professional?\nWhat is your current role or field of study?\nWhat kind of career guidance are you looking for?"}
 
 If user type is STUDENT but context is insufficient:
-{"has_context": false, "user_type": "student", "current_role": "", "skills": ["<explicitly stated skill>"], "career_goal": "", "followup_questions": "What degree or subject are you studying (or did you recently graduate in)?\nWhat skills, tools, or areas interest you most?\nWhat kind of roles or industry are you hoping to enter?"}
+{"has_context": false, "user_type": "student", "current_role": "", "career_history": [], "skills": ["<explicitly stated skill>"], "career_goal": "", "followup_questions": "What degree or subject are you studying (or did you recently graduate in)?\nWhat skills, tools, or areas interest you most?\nWhat kind of roles or industry are you hoping to enter?"}
 
 If user type is PROFESSIONAL but context is insufficient:
-{"has_context": false, "user_type": "professional", "current_role": "<explicit role or empty>", "skills": ["<explicitly stated skill>"], "career_goal": "", "followup_questions": "What is your current job title and how many years of experience do you have?\nWhat are your main skills or technologies?\nAre you looking to switch roles, upskill, change industry, or get promoted?"}
+{"has_context": false, "user_type": "professional", "current_role": "<explicit role or empty>", "career_history": ["<explicit past or current role title>"], "skills": ["<explicitly stated skill>"], "career_goal": "", "followup_questions": "What is your current job title and how many years of experience do you have?\nWhat are your main skills or technologies?\nAre you looking to switch roles, upskill, change industry, or get promoted?"}
 
 If context is sufficient:
-{"has_context": true, "user_type": "<student|professional>", "current_role": "<explicit current role or empty for student>", "skills": ["<explicitly owned skill>"], "career_goal": "<explicit goal>"}
+{"has_context": true, "user_type": "<student|professional>", "current_role": "<explicit current role or empty for student>", "career_history": ["<explicit roles oldest to newest>"], "skills": ["<explicitly owned skill>"], "career_goal": "<explicit goal>"}
 """.strip()
 
 
@@ -164,6 +166,7 @@ def route_intent(query: str, settings: "Settings", history: list[dict] | None = 
             "has_context": True,
             "user_type": "professional",
             "current_role": "",
+            "career_history": [],
             "skills": [],
             "career_goal": "",
         }
@@ -782,6 +785,7 @@ def run_query(
     history: list[dict] | None = None,
     transition_smoother=None,
     link_prediction_runtime=None,
+    sequential_runtime=None,
 ) -> dict:
     """Orchestrate the full GraphRAG inference loop.
 
@@ -796,6 +800,7 @@ def run_query(
             "has_context": True,
             "user_type": "professional",
             "current_role": "",
+            "career_history": [],
             "skills": [],
             "career_goal": "",
         }
@@ -827,6 +832,11 @@ def run_query(
         }
         current_role_id = None
 
+    from src.career_history import resolve_career_history
+    history_role_ids = resolve_career_history(
+        intent.get("career_history", []), current_role_id, G
+    )
+
     public_evidence = {
         "current_role": (
             {
@@ -846,6 +856,11 @@ def run_query(
         ],
         "unmatched_skills": skill_evidence["unmatched"],
         "excluded_non_owned_skills": skill_evidence.get("excluded", []),
+        "resolved_career_history": [
+            {"id": role_id, "title": G.nodes[role_id].get("title", role_id)}
+            for role_id in history_role_ids
+            if G.has_node(role_id)
+        ],
     }
 
     # 2. Hybrid retrieval (always run — even for partial context)
@@ -860,6 +875,8 @@ def run_query(
         settings,
         transition_smoother=transition_smoother,
         link_prediction_runtime=link_prediction_runtime,
+        sequential_runtime=sequential_runtime,
+        history_role_ids=history_role_ids,
     )
 
     if not candidates:
@@ -956,7 +973,8 @@ def run_query(
 
     # 7b. Compute Transition Effort Scores for each role in the path
     try:
-        from src.transition_effort import transition_effort_score, get_idf_map, EffortWeights
+        from src.transition_effort import transition_effort_score, get_idf_map
+        from src.tes_calibration import load_calibration
 
         roles = path_data.get("roles", [])
         # Fall back to first recommended role as synthetic source when current role is unknown
@@ -969,12 +987,7 @@ def run_query(
 
         if effective_source_id and roles:
             idf_map = get_idf_map(G)
-            weights = EffortWeights(
-                skill_gap=settings.effort_weight_skill_gap,
-                domain=settings.effort_weight_domain,
-                empirical=settings.effort_weight_empirical,
-                transferability=settings.effort_weight_transferability,
-            )
+            calibration = load_calibration(settings.effort_calibration_path)
             owned = skill_evidence.get("skill_ids", set())
             for role_entry in roles:
                 target_id = role_entry["id"]
@@ -983,15 +996,18 @@ def run_query(
                 try:
                     effort = transition_effort_score(
                         effective_source_id, target_id,
-                        owned, G, idf_map, weights,
+                        owned, G, idf_map, None,
                         transition_smoother,
                         settings.onet_importance_threshold,
+                        calibration,
                     )
                     role_entry["effort_score"] = round(effort.score, 4)
                     role_entry["effort_band"] = effort.band
                     role_entry["effort_source"] = effort_source_label
                     role_entry["estimated_weeks_min"] = effort.estimated_weeks_min
                     role_entry["estimated_weeks_max"] = effort.estimated_weeks_max
+                    role_entry["estimated_weeks_basis"] = "heuristic"
+                    role_entry["effort_calibration"] = effort.calibration.to_dict()
                 except Exception as exc:
                     print(f"[inference_pipeline] Effort for {target_id}: {exc}")
     except Exception as exc:

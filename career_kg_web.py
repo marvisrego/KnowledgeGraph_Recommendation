@@ -15,6 +15,7 @@ from src.inference_pipeline import run_query
 from src.transition_embedding import RuntimeTransitionSmoother, SmoothingConfig
 from src.transition_policy import is_training_transition
 from src.hybrid_retrieval import build_link_prediction_runtime
+from src.sequential_ranking import build_sequential_ranking_runtime
 
 
 def create_app():
@@ -48,10 +49,14 @@ def create_app():
         "link_prediction_runtime": None,
         "link_prediction_attempted": False,
         "link_prediction_error": None,
+        "sequential_ranking_runtime": None,
+        "sequential_ranking_attempted": False,
+        "sequential_ranking_error": None,
     }
     _resource_lock = threading.Lock()
     _smoother_lock = threading.Lock()
     _link_prediction_lock = threading.Lock()
+    _sequential_ranking_lock = threading.Lock()
 
     def _load_resources() -> tuple:
         if _cache["graph"] is None or _cache["collection"] is None:
@@ -81,6 +86,7 @@ def create_app():
                     neighbours=settings.transition_smoothing_neighbours,
                     direct_weight=settings.transition_smoothing_direct_weight,
                     temperature=settings.transition_smoothing_temperature,
+                    prior_strength=settings.transition_smoothing_prior_strength,
                 )
                 _cache["transition_smoother"] = RuntimeTransitionSmoother(
                     G,
@@ -114,6 +120,25 @@ def create_app():
             finally:
                 _cache["link_prediction_attempted"] = True
         return _cache["link_prediction_runtime"]
+
+    def _load_sequential_ranking_runtime():
+        if not settings.sequential_ranking_enabled:
+            return None
+        if _cache["sequential_ranking_attempted"]:
+            return _cache["sequential_ranking_runtime"]
+        with _sequential_ranking_lock:
+            if _cache["sequential_ranking_attempted"]:
+                return _cache["sequential_ranking_runtime"]
+            try:
+                _cache["sequential_ranking_runtime"] = build_sequential_ranking_runtime(
+                    settings.sequential_ranking_artifact_path
+                )
+            except Exception as exc:
+                _cache["sequential_ranking_error"] = str(exc)
+                print(f"[career_kg_web] Sequential ranking unavailable: {exc}")
+            finally:
+                _cache["sequential_ranking_attempted"] = True
+        return _cache["sequential_ranking_runtime"]
 
     def _send_react_index():
         # Vercel normalizes file timestamps. Same-size HTML builds can therefore
@@ -260,6 +285,7 @@ def create_app():
         G, collection = _load_resources()
         transition_smoother = _load_transition_smoother(G, collection)
         link_prediction_runtime = _load_link_prediction_runtime(G, collection)
+        sequential_ranking_runtime = _load_sequential_ranking_runtime()
         return jsonify(
             {
                 "ready": G is not None and collection is not None,
@@ -284,6 +310,14 @@ def create_app():
                 "link_prediction_diagnostics": (
                     link_prediction_runtime.diagnostics()
                     if link_prediction_runtime is not None
+                    else None
+                ),
+                "sequential_ranking_enabled": settings.sequential_ranking_enabled,
+                "sequential_ranking_loaded": sequential_ranking_runtime is not None,
+                "sequential_ranking_error": _cache["sequential_ranking_error"],
+                "sequential_ranking_diagnostics": (
+                    sequential_ranking_runtime.diagnostics()
+                    if sequential_ranking_runtime is not None
                     else None
                 ),
                 "chat_model": settings.chat_model,
@@ -322,6 +356,7 @@ def create_app():
         try:
             transition_smoother = _load_transition_smoother(G, collection)
             link_prediction_runtime = _load_link_prediction_runtime(G, collection)
+            sequential_ranking_runtime = _load_sequential_ranking_runtime()
 
             if settings.use_langgraph:
                 from agents.graph import run_career_workflow
@@ -333,6 +368,7 @@ def create_app():
                     collection,
                     transition_smoother,
                     link_prediction_runtime,
+                    sequential_ranking_runtime,
                 )
             else:
                 result = run_query(
@@ -343,6 +379,7 @@ def create_app():
                     history=messages,
                     transition_smoother=transition_smoother,
                     link_prediction_runtime=link_prediction_runtime,
+                    sequential_runtime=sequential_ranking_runtime,
                 )
             return jsonify({
                 "status": "ok",

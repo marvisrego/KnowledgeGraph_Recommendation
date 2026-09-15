@@ -135,6 +135,42 @@ The transition ranker was selected on validation data and evaluated once on the 
 
 The accepted production ranker is the semantic smoother: its top-K gains are modest, but source-role coverage rises from 73.9% to 100%.
 
+### Sequential-ranking research status (2026-09-15)
+
+The primary offline task is leakage-safe, person-disjoint next-occupation
+ranking over all 3,039 live ESCO occupations, with the current role excluded.
+Only Karrierewege training trajectories supply transition evidence. The
+strongest completed neural result is a causal Transformer with a learned
+occupation-ID residual, pretrained on JobHop v2 training records and
+fine-tuned only on Karrierewege training data.
+
+| Evaluation split / method | MRR | Hits@1 | Hits@3 | Hits@5 | Hits@10 | Coverage |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Validation: selected ID-residual causal Transformer, seed 41 | 0.3103 | 0.1899 | 0.3460 | 0.4342 | 0.5641 | 1.0000 |
+| Validation: checksum-frozen fusion, seed 41 | 0.3125 | 0.1920 | 0.3512 | 0.4360 | 0.5658 | 1.0000 |
+| Held-out test: checksum-frozen fusion, seed 41 | **0.3134** | **0.1942** | **0.3512** | **0.4356** | **0.5648** | **1.0000** |
+| Held-out test: accepted semantic smoother | 0.2618 | 0.1483 | 0.2857 | 0.3723 | 0.5059 | 1.0000 |
+
+Four completed validation seeds (`17, 29, 41, 53`) were selected by MRR, then
+Hits@5, then Hits@10. Seed 41 won (MRR 0.310251); the MRR standard deviation
+was 0.000113. The planned fifth seed was stopped before completion at the
+user's direction, so this is explicitly a four-seed stability record. Fusion
+weights were selected and checksum-bound on validation before seed 41's test
+was read. The paired person-bootstrap 95% interval for the test Hits@10 gain
+over the smoother is `[0.05702, 0.06077]`; the MRR-gain interval is
+`[0.05025, 0.05292]`.
+
+This is a substantial held-out improvement, but not a production promotion:
+the final 56.48% Hits@10 remains below the requested 60-65% target. Seed 17's
+earlier standalone test remains a diagnostic only because it was observed
+before the multi-seed selection. `SEQUENTIAL_RANKING_ENABLED` remains `false`;
+the semantic smoother continues to be deployed.
+
+JobHop's person-level source fields are intentionally not copied into the
+Karrierewege benchmark or runtime. A separate JobHop feature-aware benchmark
+reached Hits@10 0.3189 and MRR 0.1614, so it is not a credible route to the
+primary target and is not fused with Karrierewege results.
+
 | Link-prediction evidence | Result | Interpretation |
 | --- | --- | --- |
 | Five-fold classification CV | AUC 0.9344; AP 0.8186 | Useful classification signal. |
@@ -193,7 +229,7 @@ Create an uncommitted `.env` file; never commit or print credentials.
 | Neo4j AuraDB | `KG_URI`, `KG_USER`, `KG_PASS`, `KG_ID`, optional `NEO4J_DATABASE` |
 | Qdrant Cloud | `VECTOR_ENDPOINT`, `VECTOR_PASS`, optional `QDRANT_COLLECTION` (default: `career_roles`) |
 
-Feature flags include `USE_LANGGRAPH`, `TRANSITION_SMOOTHING_ENABLED`, and `LINK_PREDICTION_ENABLED`. See `config.py` for all defaults, limits, and TES weights.
+Feature flags include `USE_LANGGRAPH`, `TRANSITION_SMOOTHING_ENABLED`, `LINK_PREDICTION_ENABLED`, and `SEQUENTIAL_RANKING_ENABLED`. The sequential flag is currently `false` pending the documented promotion gate. See `config.py` for all defaults, limits, and TES weights.
 
 ## Verification
 

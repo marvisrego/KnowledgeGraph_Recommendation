@@ -130,6 +130,22 @@ class TransitionEmbeddingTests(unittest.TestCase):
         self.assertAlmostEqual(backoff[0].score, 0.9)
         self.assertEqual(rank_hybrid_destinations("unknown", distributions, neighbours, config), [])
 
+    def test_empirical_bayes_uses_counts_not_a_global_direct_weight(self) -> None:
+        graph = _graph()
+        distributions = transition_distributions(graph)
+        ranked = rank_hybrid_destinations(
+            "source",
+            distributions,
+            {"source": [("neighbour", 0.9)]},
+            SmoothingConfig(1, 0.01, 0.1, prior_strength=10.0),
+            graph,
+        )
+        by_id = {item.role_id: item for item in ranked}
+        # (8 + 10*0) / (10 + 10): direct evidence is support-aware rather
+        # than the legacy fixed 1% contribution.
+        self.assertAlmostEqual(by_id["direct"].score, 0.4)
+        self.assertAlmostEqual(by_id["backoff"].score, 0.45)
+
     def test_prediction_map_is_normalized_and_json_safe(self) -> None:
         graph = _graph()
         distributions = transition_distributions(graph)

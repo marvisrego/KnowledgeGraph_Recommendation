@@ -94,7 +94,7 @@ class TestSkillGapMagnitude(unittest.TestCase):
     def test_no_coverage(self):
         idf = {"a": 1.0, "b": 2.0}
         result = skill_gap_magnitude(set(), {"a", "b"}, idf)
-        self.assertAlmostEqual(result, 1.0)
+        self.assertIsNone(result)
 
     def test_partial_coverage_weighted(self):
         idf = {"a": 1.0, "b": 3.0}
@@ -104,7 +104,7 @@ class TestSkillGapMagnitude(unittest.TestCase):
         self.assertAlmostEqual(result, expected)
 
     def test_empty_requirements(self):
-        self.assertEqual(skill_gap_magnitude({"a"}, set(), {}), 1.0)
+        self.assertIsNone(skill_gap_magnitude({"a"}, set(), {}))
 
 
 class TestDomainDistance(unittest.TestCase):
@@ -117,13 +117,13 @@ class TestDomainDistance(unittest.TestCase):
     def test_different_isco(self):
         G = _build_effort_graph()
         # analyst (25) vs surgeon (22)
-        self.assertAlmostEqual(domain_distance("analyst", "surgeon", G), 1.0)
+        self.assertAlmostEqual(domain_distance("analyst", "surgeon", G), 0.75)
 
     def test_missing_isco(self):
         G = nx.MultiDiGraph()
         G.add_node("r1", type="role", source="esco")
         G.add_node("r2", type="role", source="esco", isco_2digit="25")
-        self.assertAlmostEqual(domain_distance("r1", "r2", G), 0.5)
+        self.assertIsNone(domain_distance("r1", "r2", G))
 
 
 class TestEmpiricalSupport(unittest.TestCase):
@@ -188,7 +188,7 @@ class TestTransferability(unittest.TestCase):
         G = _build_effort_graph()
         G.add_node("empty_role", type="role", source="esco")
         idf = {nid: d["idf"] for nid, d in G.nodes(data=True) if "idf" in d}
-        self.assertEqual(transferability("analyst", "empty_role", G, idf), 0.0)
+        self.assertIsNone(transferability("analyst", "empty_role", G, idf))
 
 
 class TestTransitionEffortScore(unittest.TestCase):
@@ -231,6 +231,8 @@ class TestTransitionEffortScore(unittest.TestCase):
         self.assertIn("effort_band", d)
         self.assertIn("components", d)
         self.assertIn("skill_gap_magnitude", d["components"])
+        self.assertEqual(d["estimated_weeks_basis"], "heuristic")
+        self.assertIn("calibration", d)
 
     def test_optional_generic_requirement_does_not_inflate_effort(self):
         G = _build_effort_graph()

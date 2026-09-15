@@ -23,6 +23,7 @@ def intent_node(state: CareerAgentState, *, settings, G, **kwargs) -> dict[str, 
             "has_context": True,
             "user_type": "professional",
             "current_role": "",
+            "career_history": [],
             "skills": [],
             "career_goal": "",
         }
