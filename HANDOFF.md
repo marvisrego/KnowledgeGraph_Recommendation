@@ -737,3 +737,16 @@ This section records the August 15 checkpoints. The current 2026-08-27 metrics, 
 - `SEQUENTIAL_RANKING_ENABLED` remains `false` and no deployable artifact was
   created: final Hits@10 `0.564807` still does not meet the requested 0.60-0.65
   threshold. The semantic smoother remains production behavior.
+
+### GitHub Actions boundary for sequential ranking
+
+The causal trajectory model is deliberately **offline-only**. The existing
+manual GitHub Actions workflow remains limited to LightGBM link-prediction
+training; it uses a standard GitHub-hosted runner with a 30-minute timeout and
+does not contain the ignored JobHop Parquet data or local role-embedding
+artifact required by the sequential experiment. A reproducible multi-seed
+causal run would require durable data storage/access, long-running compute,
+and likely a paid larger or self-hosted runner. It must therefore be described
+as offline research infrastructure in the paper, not as part of the current
+GitHub Actions deployment pipeline. Any future workflow should be manual-only,
+upload experiment artifacts, and never auto-promote or deploy a ranker.
